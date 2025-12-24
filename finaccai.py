@@ -12,7 +12,9 @@ Features:
 - Generates a visually presentable HTML report in a 'log' folder.
 
 Usage:
-    python finaccai_report.py --csv sites.csv
+    python finaccai.py --csv sites.csv
+
+Run in CI: the included GitHub Actions workflow executes the scanner and uploads `log/` HTML reports as artifacts.
 
 CSV format:
     url
