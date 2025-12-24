@@ -5,7 +5,8 @@ FinAccAI is a Python-based accessibility auditing prototype that performs automa
 [![Accessibility scan](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml/badge.svg)](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml)
 
 ---
-
+## Architecture Overview
+![FinAccAI Architecture](docs/FinACCAI_Architecture_Diagram.png)
 ## Key Capabilities ✅
 
 - **Image accessibility** — detects `<img>` elements with missing or empty `alt` attributes
