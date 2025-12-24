@@ -1,156 +1,125 @@
-Accessibility Testing Automation using AI model
-FinAccAI – Automated Web Accessibility Audit Prototype
-Overview
+# Accessibility Testing Automation — FinAccAI
 
-FinAccAI is a Python-based accessibility auditing prototype that performs automated, rule-based checks on websites to identify common WCAG-aligned accessibility issues. The tool is designed to help QA engineers, accessibility auditors, and development teams quickly assess baseline accessibility compliance across one or multiple web applications.
+FinAccAI is a Python-based accessibility auditing prototype that performs automated, rule-based checks on websites to identify common WCAG-aligned accessibility issues. The tool is useful for QA engineers, accessibility auditors, and development teams who want a fast, lightweight assessment of baseline accessibility across one or more web applications.
 
-FinAccAI scans HTML content, detects common violations, and generates a clear, human-readable HTML report summarizing findings at both site and issue-category levels.
+[![Accessibility scan](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml/badge.svg)](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml)
 
-This project focuses on practical, lightweight accessibility validation suitable for early testing, regression checks, and compliance readiness reviews.
+---
 
-Key Capabilities
+## Key Capabilities ✅
 
-FinAccAI currently performs the following automated checks:
+- **Image accessibility** — detects `<img>` elements with missing or empty `alt` attributes
+- **Form accessibility** — identifies `<input>` elements without an associated `<label>`, `aria-label`, or `aria-labelledby`
+- **Color contrast (inline styles)** — flags low contrast when inline CSS uses hex foreground/background colors (uses WCAG contrast ratio thresholds)
+- **Heading structure validation** — detects skipped heading levels (e.g., `<h2>` followed directly by `<h4>`)
+- **Multi-site scanning** — scan multiple URLs provided in a CSV file
+- **Reporting** — generates a styled HTML report (`log/`) with summary metrics and per-site, per-category findings
 
-Image Accessibility
+---
 
-Detects <img> elements with missing or empty alt attributes
+## Intended Use Cases
 
-Form Accessibility
+- Accessibility smoke testing during development
+- QA validation before accessibility audits
+- Regression checks in CI/CD pipelines
+- Early identification of WCAG-related risks
+- Educational and research-oriented accessibility analysis
 
-Identifies <input> elements without associated <label>, aria-label, or aria-labelledby attributes
+> ⚠️ Note: FinAccAI is a prototype. It performs rule-based, static HTML checks and does **not** replace manual testing with real assistive technologies.
 
-Color Contrast (Inline Styles)
+---
 
-Flags insufficient color contrast where inline CSS uses hexadecimal foreground and background colors
+## Prerequisites
 
-Uses WCAG contrast ratio thresholds for detection
+- Python 3.7 or higher
+- Python packages:
+  - `requests`
+  - `beautifulsoup4`
 
-Heading Structure Validation
+Install dependencies:
 
-Detects skipped heading levels (e.g., <h1> followed directly by <h3>)
-
-Multi-Site Scanning
-
-Supports scanning multiple URLs provided via a CSV file
-
-Reporting
-
-Generates a styled HTML report with:
-
-Summary metrics
-
-Per-site status
-
-Categorized issue listings
-
-Reports are saved under the log/ directory
-
-Intended Use Cases
-
-FinAccAI is suitable for:
-
-Accessibility smoke testing during development
-
-QA validation before accessibility audits
-
-Regression checks in CI/CD pipelines
-
-Early identification of WCAG-related risks
-
-Educational and research-oriented accessibility analysis
-
-⚠️ Note:
-This tool is a prototype and does not replace full manual or assistive-technology testing. It is intended to complement expert accessibility reviews.
-
-Prerequisites
-
-Python 3.7 or higher
-
-Required Python packages:
-
-requests
-
-beautifulsoup4
-
-Install dependencies using:
-
+```bash
 pip install requests beautifulsoup4
+```
 
-How It Works (High-Level)
+---
 
-Reads a CSV file containing website URLs
+## How it works (high-level)
 
-Fetches HTML content for each URL
+1. Reads a CSV file containing website URLs (expects a `url` column)
+2. Fetches HTML for each URL
+3. Applies rule-based accessibility checks
+4. Aggregates findings across sites
+5. Writes a timestamped HTML report to `log/`
 
-Applies rule-based accessibility checks
+---
 
-Aggregates findings across all sites
+## Input format
 
-Generates a timestamped HTML report
+CSV must contain a column named `url`, for example:
 
-Input Format
-
-CSV file must contain a column named url:
-
+```csv
 url
 https://example.com
 https://another-site.com
+```
 
-Running the Tool
-python finaccai.py --csv sites.csv
+---
 
+## Running the tool
 
-After execution, the accessibility report will be generated under:
+```bash
+python finaccai.py --csv websites.csv
+```
 
-log/accessibility_report_<timestamp>.html
+Output: a timestamped HTML report saved under `log/`, e.g. `log/accessibility_report_YYYY-MM-DD_HHMMSS.html`.
 
-Output
+---
 
-The HTML report includes:
+## CI/CD Compatibility
 
-Total sites scanned
+FinAccAI is CI-friendly and can be integrated into pipelines. This repository includes a GitHub Actions workflow (`.github/workflows/scan.yml`) that runs the scanner and uploads generated reports as workflow artifacts.
 
-Sites with accessibility issues
+---
 
-Sites with fetch errors
+## Project status & scope
 
-Detailed issue breakdown per site:
+- Rule-based checks only (no headless browser or JS execution)
+- Color contrast limited to inline CSS hex colors
+- Static HTML analysis (no JS-rendered DOM at this time)
+- Prototype / research focus
 
-Images missing alt text
+**Future enhancements (examples):** CSS file parsing, ARIA role validation, JavaScript DOM rendering support, accessibility scoring metrics.
 
-Inputs without labels
+---
 
-Low contrast elements
+## License & usage
 
-Heading structure issues
+This project is provided for research, education, and evaluation. Feel free to adapt and extend the framework for your own accessibility workflows.  
 
-CI/CD Compatibility
+This project targets web developers, accessibility auditors, QA teams, or anyone who needs to quickly gauge accessibility compliance on a set of URLs.  
 
-FinAccAI is designed to be CI-friendly and can be integrated into automated pipelines.
-The generated HTML reports can be archived as build artifacts for audit and review purposes.
+---
 
-Project Status & Scope
+## 📄 Features & What It Checks
 
-Rule-based checks only (no browser automation)
+- Detects `<img>` tags missing or having empty `alt` attributes  
+- Identifies `<input>` fields without a corresponding `<label>` or `aria-label` / `aria-labelledby`  
+- Detects inline-styled text elements with insufficient color contrast (hex colors only)  
+- Checks for heading structure consistency: warns if heading levels are skipped (e.g., `<h1>` → `<h3>`)  
+- Supports scanning multiple websites listed in a CSV file  
+- Generates a clean, styled HTML report (saved under `log/`) with summary and per-site issue breakdown  
 
-Inline CSS color contrast checks only
+---
 
-Focused on static HTML analysis
+## 🧰 Prerequisites
 
-Prototype / research-oriented implementation
+- Python 3.7 or above  
+- `requests` library  
+- `beautifulsoup4` (bs4) library  
 
-Future enhancements may include:
+You can install required dependencies via:
 
-CSS file parsing
+```bash
+pip install requests beautifulsoup4
 
-ARIA role validation
-
-JavaScript-rendered DOM analysis
-
-Accessibility scoring metrics
-
-License & Usage
-
-This project is provided for research, educational, and evaluation purposes.
-Users are encouraged to adapt and extend the framework for their own accessibility workflows.
