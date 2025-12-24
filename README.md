@@ -1,6 +1,6 @@
 # Accessibility Testing Automation — FinAccAI
 
-FinAccAI is a Python-based accessibility auditing prototype that performs automated, rule-based checks on websites to identify common WCAG-aligned accessibility issues. The tool is useful for QA engineers, accessibility auditors, and development teams who want a fast, lightweight assessment of baseline accessibility across one or more web applications.
+FinAccAI is a Python-based accessibility testing prototype that performs automated, rule-based testing on websites to identify common WCAG-aligned accessibility issues. The tool is useful for QA engineers, accessibility auditors, and development teams who want a fast, lightweight assessment of baseline accessibility across one or more web applications.
 
 [![Accessibility scan](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml/badge.svg)](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml)
 
