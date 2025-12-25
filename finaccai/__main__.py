@@ -1,19 +1,9 @@
-"""Package entrypoint to run the top-level `finaccai.py` script.
+"""Package entrypoint to run the package CLI: `finaccai.cli.main()`.
 
-This keeps the repository layout unchanged while allowing:
-
-    python -m finaccai --csv websites.csv
-
+This enables `python -m finaccai --csv websites.csv` and delegates to
+`finaccai.cli.main()` for a cleaner package layout.
 """
-import os
-import runpy
-import sys
+from .cli import main
 
-ROOT = os.path.dirname(os.path.dirname(__file__))
-SCRIPT = os.path.join(ROOT, "finaccai.py")
-if not os.path.exists(SCRIPT):
-    print("Could not find finaccai.py at expected location.", file=sys.stderr)
-    sys.exit(1)
-
-# Execute the script as __main__ so it behaves like a script when invoked with -m
-runpy.run_path(SCRIPT, run_name="__main__")
+if __name__ == "__main__":
+    main()
