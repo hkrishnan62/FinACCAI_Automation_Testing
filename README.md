@@ -7,6 +7,7 @@ FinAccAI is a Python-based accessibility testing prototype that performs automat
 ---
 ## Architecture Overview
 ![FinAccAI Architecture](docs/FinACCAI_Architecture_Diagram_1.png)
+
 ## Key Capabilities ✅
 
 - **Image accessibility** — detects `<img>` elements with missing or empty `alt` attributes
