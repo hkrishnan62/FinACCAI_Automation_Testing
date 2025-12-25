@@ -69,11 +69,66 @@ https://another-site.com
 
 ## Running the tool
 
+Recommended: create a virtual environment and install dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Run the scanner as a package (recommended):
+
+```bash
+python -m finaccai --csv websites.csv
+```
+
+A backwards-compatible wrapper is provided, so you can also run:
+
 ```bash
 python finaccai.py --csv websites.csv
 ```
 
 Output: a timestamped HTML report saved under `log/`, e.g. `log/accessibility_report_YYYY-MM-DD_HHMMSS.html`.
+
+---
+
+## Project structure
+
+- `finaccai/` — package modules
+  - `finaccai/script.py` — core scanner functions (fetching, checks, report generation, CSV handling)
+  - `finaccai/cli.py` — CLI entrypoint (`main()`)
+  - `finaccai/__main__.py` — package entry so `python -m finaccai` works
+- `finaccai.py` — lightweight wrapper delegating to the package CLI (backwards compatibility)
+- `tests/` — test suite (includes a smoke test to ensure pytest finds at least one test)
+- `models/` — large model artifacts (tracked with Git LFS)
+- `log/` — generated HTML reports
+
+---
+
+## Models & Git LFS
+
+Large model files (e.g. `.safetensors`) are tracked using Git LFS and are not stored directly in Git history. After cloning the repository, fetch the LFS objects:
+
+```bash
+git lfs install
+git lfs pull
+```
+
+Do not commit raw model files directly; either add them to `.gitignore` or host externally (Hugging Face, S3, etc.).
+
+---
+
+## Running tests & CI
+
+Run unit tests locally:
+
+```bash
+pip install pytest
+python -m pytest --maxfail=1 --disable-warnings -q
+```
+
+The GitHub Actions workflow installs `pytest` before running tests and a small smoke test is included so the job does not fail with "no tests ran".
 
 ---
 
