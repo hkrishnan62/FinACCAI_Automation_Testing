@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased (2025-12-25)
+## Unreleased
+
+## [v0.1.0] - 2025-12-25
 
 ### Changed
 - **Refactor:** Moved core scanner logic from the top-level script into a package layout:
