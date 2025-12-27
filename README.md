@@ -10,34 +10,29 @@ FinAccAI is a Python-based accessibility testing prototype that performs automat
 
 ## Key Capabilities ✅
 
-- **Image accessibility** — detects `<img>` elements with missing or empty `alt` attributes
-- **Form accessibility** — identifies `<input>` elements without an associated `<label>`, `aria-label`, or `aria-labelledby`
-- **Color contrast (inline styles)** — flags low contrast when inline CSS uses hex foreground/background colors (uses WCAG contrast ratio thresholds)
-- **Heading structure validation** — detects skipped heading levels (e.g., `<h2>` followed directly by `<h4>`)
-- **Multi-site scanning** — scan multiple URLs provided in a CSV file
-- **Reporting** — generates a styled HTML report (`log/`) with summary metrics and per-site, per-category findings
+
+- **Model-driven analysis (optional)** — integrates ML/NLP/vision modules to supplement rule-based checks (image captioning, NLP context checks, and explainability outputs)
 
 ---
 
 ## Intended Use Cases
 
-- Accessibility smoke testing during development
+3. Applies rule-based accessibility checks and, optionally, model-driven ML/NLP/vision checks for supplementary findings
 - QA validation before accessibility audits
 - Regression checks in CI/CD pipelines
 - Early identification of WCAG-related risks
-- Educational and research-oriented accessibility analysis
 
-> ⚠️ Note: FinAccAI is a prototype. It performs rule-based, static HTML checks and does **not** replace manual testing with real assistive technologies.
+### AI & ML features (experimental)
 
----
-
+- **Vision captioning & image context:** optional modules can generate captions or detect decorative vs meaningful images to improve `alt` coverage checks.
+- **NLP-assisted checks:** analyze surrounding text, labels, and form context to surface likely missing labels or semantic mismatches.
+- **Explainability outputs:** XAI helpers provide human-readable rationale for model-driven flags so results remain auditable.
+- **Opt-in & auditable:** model-driven checks are optional; they augment rule-based findings and are intended for research and CI augmentation, not as sole sources of truth.
 ## Prerequisites
 
 - Python 3.7 or higher
-- Python packages:
-  - `requests`
-  - `beautifulsoup4`
 
+- Experimental ML/NLP/vision modules included; model-driven checks are optional and intended for research/augmentation of rule-based results
 Install dependencies:
 
 ```bash
@@ -148,7 +143,14 @@ FinAccAI is CI-friendly and can be integrated into pipelines. This repository in
 
 **Future enhancements (examples):** CSS file parsing, ARIA role validation, JavaScript DOM rendering support, accessibility scoring metrics.
 
----
+## Why choose FinAccAI over Wave and Axe
+
+- **Bulk, multi-site scanning:** FinAccAI accepts CSV input to scan many sites in one run and produce aggregated reports. Wave (a browser extension) and Axe (a page-by-page library/extension) are primarily focused on single-page or interactive testing.
+- **CI/CD & automation friendly:** FinAccAI is a CLI-first Python tool designed to run in pipelines and produce timestamped HTML artifacts suitable for archival and automation.
+- **Lightweight, scriptable, and transparent:** Implemented in Python with rule logic in plain code, making it easy to customize checks, extend rules, and integrate with existing Python tooling and data workflows.
+- **Team-ready reporting:** Generates consistent HTML reports saved under `log/` for sharing, tracking regressions, and attaching to CI runs—useful for audits and batch reviews.
+- **Extensible with model/XAI modules:** The project contains modules for model-driven analysis and explainability (where applicable), enabling research workflows that go beyond single-page, manual inspections.
+- **Complements, not replaces, manual & browser-based testing:** Wave and Axe are excellent for in-browser, interactive, and DOM-level analysis; FinAccAI is complementary for fast baseline scans, batch auditing, and CI integration.
 
 ## License & usage
 
