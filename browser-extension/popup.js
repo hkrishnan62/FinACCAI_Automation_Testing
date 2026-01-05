@@ -1,5 +1,6 @@
 // Popup script for FinACCAI extension
 let currentReport = null;
+let currentPageData = null;  // Store current page analysis data
 
 document.addEventListener('DOMContentLoaded', async function() {
   const analyzeBtn = document.getElementById('analyzeBtn');
@@ -73,6 +74,9 @@ document.addEventListener('DOMContentLoaded', async function() {
           return;
         }
         
+        // Store page data for report generation
+        currentPageData = response;
+        
         // Display client-side check results
         displayQuickChecks(response.clientChecks);
         
@@ -99,12 +103,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Show client checks even if backend fails
             aiStatusDiv.innerHTML = `
               <p style="color: #856404;">⚠ Backend API not available</p>
-              <p style="font-size: 12px;">Make sure the FinACCAI server is running on localhost:5000</p>
-              <p style="font-size: 12px;">You can still see basic client-side checks above.</p>
+              <p style="font-size: 12px;">Client-side analysis completed successfully.</p>
+              <p style="font-size: 12px;">You can download a report of the findings below.</p>
             `;
-            statusDiv.innerHTML = '<p>⚠ Partial analysis (client-side only)</p>';
-            statusDiv.className = 'status';
+            statusDiv.innerHTML = '<p>✓ Client-side scan complete</p>';
+            statusDiv.className = 'status success';
             resultsDiv.classList.remove('hidden');
+            downloadReportBtn.classList.remove('hidden');
           }
         });
       });
@@ -251,14 +256,240 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   
   function downloadReport() {
+    // Use stored page data for report generation
+    if (currentPageData) {
+      const reportHtml = generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks);
+      downloadHtmlFile(reportHtml, `accessibility_report_${Date.now()}.html`);
+      return;
+    }
+    
+    // Fallback: try to get backend report if available
     if (currentReport && currentReport.reportPath) {
-      // Download the report
-      chrome.downloads.download({
-        url: `http://localhost:5000/reports/${currentReport.reportPath}`,
-        filename: `accessibility_report_${Date.now()}.html`
+      const reportUrl = `http://localhost:5000/reports/${currentReport.reportPath}`;
+      chrome.tabs.create({ url: reportUrl });
+    } else {
+      alert('No report data available. Please analyze the page first.');
+    }
+  }
+  
+  function generateClientReport(url, title, checks) {
+    const timestamp = new Date().toLocaleString();
+    const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
+    
+    let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Report - ${escapeHtml(title)}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .header h1 { margin: 0 0 10px 0; }
+        .summary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .summary-item:last-child { border-bottom: none; }
+        .count {
+            font-weight: bold;
+            font-size: 24px;
+            color: #dc3545;
+        }
+        .count.success { color: #28a745; }
+        .category {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .category h2 {
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            color: #333;
+        }
+        .issue {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #dc3545;
+            border-radius: 4px;
+        }
+        .issue-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .issue-detail {
+            color: #666;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        .code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .no-issues {
+            color: #28a745;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+        .element-id {
+            background: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 FinACCAI Accessibility Report</h1>
+        <p><strong>Page:</strong> ${escapeHtml(title)}</p>
+        <p><strong>URL:</strong> ${escapeHtml(url)}</p>
+        <p><strong>Generated:</strong> ${timestamp}</p>
+        <p><em>Client-side analysis</em></p>
+    </div>
+    
+    <div class="summary">
+        <h2>Summary</h2>
+        <div class="summary-item">
+            <span>Total Issues Found:</span>
+            <span class="count ${totalIssues === 0 ? 'success' : ''}">${totalIssues}</span>
+        </div>
+        <div class="summary-item">
+            <span>🖼️ Missing Alt Text:</span>
+            <span class="count ${checks.images.length === 0 ? 'success' : ''}">${checks.images.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>📝 Unlabeled Inputs:</span>
+            <span class="count ${checks.inputs.length === 0 ? 'success' : ''}">${checks.inputs.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>📑 Heading Hierarchy:</span>
+            <span class="count ${checks.headings.length === 0 ? 'success' : ''}">${checks.headings.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>🔗 Link Issues:</span>
+            <span class="count ${checks.links.length === 0 ? 'success' : ''}">${checks.links.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>♿ ARIA Issues:</span>
+            <span class="count ${checks.aria.length === 0 ? 'success' : ''}">${checks.aria.length}</span>
+        </div>
+    </div>
+`;
+    
+    // Images section
+    html += generateReportSection('🖼️ Missing Alt Text', checks.images, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Image without alt text</div>
+            <div class="issue-detail"><strong>Element:</strong> &lt;img&gt;</div>
+            <div class="issue-detail"><strong>Source:</strong> ${escapeHtml(issue.src || 'N/A')}</div>
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - all images have alt text');
+    
+    // Inputs section
+    html += generateReportSection('📝 Unlabeled Input Fields', checks.inputs, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Input without proper label</div>
+            <div class="issue-detail"><strong>Element:</strong> &lt;input type="${issue.type || 'text'}"&gt;</div>
+            ${issue.id ? `<div class="issue-detail"><strong>ID:</strong> <span class="element-id">${escapeHtml(issue.id)}</span></div>` : ''}
+            ${issue.name ? `<div class="issue-detail"><strong>Name:</strong> <span class="element-id">${escapeHtml(issue.name)}</span></div>` : ''}
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - all inputs are properly labeled');
+    
+    // Headings section
+    html += generateReportSection('📑 Heading Hierarchy Issues', checks.headings, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Heading hierarchy problem</div>
+            <div class="issue-detail"><strong>Problem:</strong> ${escapeHtml(issue.message)}</div>
+            <div class="issue-detail"><strong>Heading text:</strong> "${escapeHtml(issue.text)}"</div>
+        </div>
+    `, '✓ No issues found - heading hierarchy is correct');
+    
+    // Links section
+    html += generateReportSection('🔗 Link Accessibility Issues', checks.links, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Link accessibility problem</div>
+            <div class="issue-detail"><strong>Problem:</strong> ${escapeHtml(issue.message)}</div>
+            ${issue.text ? `<div class="issue-detail"><strong>Link text:</strong> "${escapeHtml(issue.text)}"</div>` : ''}
+            ${issue.href ? `<div class="issue-detail"><strong>URL:</strong> ${escapeHtml(issue.href)}</div>` : ''}
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - all links are accessible');
+    
+    // ARIA section
+    html += generateReportSection('♿ ARIA Accessibility Issues', checks.aria, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: ARIA attribute problem</div>
+            <div class="issue-detail"><strong>Element role:</strong> <span class="element-id">${escapeHtml(issue.role)}</span></div>
+            <div class="issue-detail"><strong>Problem:</strong> ${escapeHtml(issue.message)}</div>
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - ARIA attributes are correct');
+    
+    html += '</body></html>';
+    return html;
+  }
+  
+  function generateReportSection(title, issues, issueFormatter, noIssuesMessage) {
+    let html = `<div class="category"><h2>${title} (${issues.length} issues)</h2>`;
+    
+    if (issues.length > 0) {
+      issues.forEach((issue, index) => {
+        html += issueFormatter(issue, index + 1);
       });
     } else {
-      alert('Report not available. Make sure the backend server is running.');
+      html += `<div class="no-issues">${noIssuesMessage}</div>`;
     }
+    
+    html += '</div>';
+    return html;
+  }
+  
+  function downloadHtmlFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({
+      url: url,
+      filename: filename,
+      saveAs: true
+    });
   }
 });
