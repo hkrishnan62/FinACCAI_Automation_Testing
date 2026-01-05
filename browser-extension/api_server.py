@@ -16,6 +16,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from finaccai import script
 
+# Try to import AI/ML modules (optional dependencies)
+AI_ML_AVAILABLE = False
+try:
+    from finaccai import nlp_analysis, ml_model, vision_analysis, xai_explanations
+    AI_ML_AVAILABLE = True
+    print("✓ AI/ML modules loaded successfully")
+except ImportError as e:
+    print(f"⚠ AI/ML modules not available: {e}")
+    print("  Running in basic mode (rule-based checks only)")
+    print("  To enable AI/ML: pip install transformers torch scikit-learn pillow")
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for browser extension
 
@@ -43,19 +54,45 @@ def analyze_page():
         # Parse HTML
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Run all accessibility checks
+        # Run basic rule-based accessibility checks
         issues = {}
         issues['images'] = script.check_images(soup)
         issues['inputs'] = script.check_inputs(soup)
         issues['contrast'] = script.check_contrast(soup)
         issues['headings'] = script.check_headings(soup)
         
+        # AI/ML Analysis (if available)
+        ai_ml_results = {}
+        if AI_ML_AVAILABLE:
+            try:
+                # NLP Analysis - analyze text content and labels
+                ai_ml_results['nlp_analysis'] = nlp_analysis.analyze_text(soup)
+                
+                # ML Model - predict potential issues based on patterns
+                ai_ml_results['ml_predictions'] = ml_model.predict_issue_from_soup(soup)
+                
+                # Vision Analysis - analyze images (if applicable)
+                ai_ml_results['vision_analysis'] = vision_analysis.analyze_images(soup, None)
+                
+                # XAI - Generate explanations for predictions
+                ai_ml_results['xai_explanations'] = xai_explanations.generate_explanations(
+                    issues, ai_ml_results
+                )
+                
+                ai_ml_results['status'] = 'AI/ML analysis completed'
+            except Exception as e:
+                ai_ml_results['status'] = f'AI/ML analysis failed: {str(e)}'
+                ai_ml_results['error'] = str(e)
+        else:
+            ai_ml_results['status'] = 'AI/ML modules not installed'
+            ai_ml_results['message'] = 'Install: pip install transformers torch scikit-learn'
+        
         # Generate HTML report
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         report_filename = f'accessibility_report_{timestamp}.html'
         report_path = os.path.join(REPORTS_DIR, report_filename)
         
-        report_html = generate_simple_report(url, title, issues)
+        report_html = generate_simple_report(url, title, issues, ai_ml_results)
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report_html)
         
@@ -63,6 +100,8 @@ def analyze_page():
             'success': True,
             'data': {
                 'issues': issues,
+                'ai_ml_results': ai_ml_results,
+                'ai_ml_enabled': AI_ML_AVAILABLE,
                 'totalIssues': sum(len(v) if isinstance(v, list) else 0 for v in issues.values()),
                 'reportPath': report_filename,
                 'reportUrl': f'/reports/{report_filename}'
@@ -76,10 +115,15 @@ def analyze_page():
         }), 500
 
 
-def generate_simple_report(url, title, issues):
+def generate_simple_report(url, title, issues, ai_ml_results=None):
     """Generate a simple HTML report."""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     total_issues = sum(len(v) if isinstance(v, list) else 0 for v in issues.values())
+    
+    # Determine analysis mode
+    analysis_mode = "Rule-Based Analysis"
+    if ai_ml_results and ai_ml_results.get('status') == 'AI/ML analysis completed':
+        analysis_mode = "Full Analysis (Rule-Based + AI/ML)"
     
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -177,6 +221,7 @@ def generate_simple_report(url, title, issues):
         <p><strong>Page:</strong> {title}</p>
         <p><strong>URL:</strong> {url}</p>
         <p><strong>Generated:</strong> {timestamp}</p>
+        <p><strong>Analysis Mode:</strong> {analysis_mode}</p>
     </div>
     
     <div class="summary">
@@ -275,6 +320,69 @@ def generate_simple_report(url, title, issues):
     else:
         html += '<div class="no-issues">✓ No issues found - heading hierarchy is correct</div>'
     html += '    </div>\n'
+    
+    # AI/ML Results section (if available)
+    if ai_ml_results:
+        html += """
+    <div class="category" style="border-left: 4px solid #667eea;">
+        <h2>🤖 AI/ML Analysis Results</h2>
+"""
+        if ai_ml_results.get('status') == 'AI/ML analysis completed':
+            html += """
+        <div class="issue" style="border-left: 4px solid #28a745; background: #d4edda;">
+            <div class="issue-title" style="color: #155724;">✓ AI/ML Analysis Completed</div>
+            <div class="issue-detail" style="color: #155724;">Advanced analysis using machine learning and natural language processing</div>
+        </div>
+"""
+            
+            # NLP Analysis Results
+            nlp = ai_ml_results.get('nlp_analysis', [])
+            if nlp:
+                html += f"""
+        <div class="issue">
+            <div class="issue-title">📝 NLP Analysis ({len(nlp)} findings)</div>
+"""
+                for finding in nlp:
+                    html += f"""
+            <div class="issue-detail">• {finding}</div>
+"""
+                html += """
+        </div>
+"""
+            
+            # ML Predictions
+            ml_pred = ai_ml_results.get('ml_predictions', {})
+            if ml_pred:
+                html += f"""
+        <div class="issue">
+            <div class="issue-title">🎯 ML Predictions</div>
+            <div class="issue-detail">Machine learning model detected patterns: {ml_pred}</div>
+        </div>
+"""
+            
+            # XAI Explanations
+            xai = ai_ml_results.get('xai_explanations', {})
+            if xai:
+                html += f"""
+        <div class="issue">
+            <div class="issue-title">💡 Explainable AI Insights</div>
+            <div class="issue-detail">AI explanation: {xai}</div>
+        </div>
+"""
+        else:
+            html += f"""
+        <div class="issue" style="border-left: 4px solid #ffc107; background: #fff3cd;">
+            <div class="issue-title" style="color: #856404;">⚠ AI/ML Not Available</div>
+            <div class="issue-detail" style="color: #856404;">{ai_ml_results.get('status', 'Unknown status')}</div>
+            <div class="issue-detail" style="color: #856404; margin-top: 10px;">
+                <strong>To enable AI/ML features:</strong><br>
+                <code style="background: #2d2d2d; color: #f8f8f2; padding: 5px; display: block; margin-top: 5px;">
+                pip install transformers torch scikit-learn pillow
+                </code>
+            </div>
+        </div>
+"""
+        html += '    </div>\n'
     
     html += """
 </body>

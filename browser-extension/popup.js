@@ -80,6 +80,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Display client-side check results
         displayQuickChecks(response.clientChecks);
         
+        // Capture screenshot with highlighted errors
+        captureScreenshotWithHighlights(tab.id, response.clientChecks).then(screenshotUrl => {
+          if (screenshotUrl) {
+            displayScreenshot(screenshotUrl);
+          }
+        });
+        
         // Send to backend for AI analysis
         statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI analysis...</p>';
         
@@ -235,15 +242,109 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   
   function displayAIStatus(data) {
-    let html = '<p>✓ ML/NLP Analysis: Complete</p>';
-    html += '<p>✓ Vision Analysis: Complete</p>';
-    html += '<p>✓ XAI Explanations: Generated</p>';
+    let html = '';
+    
+    if (data.ai_ml_enabled) {
+      html += '<p style="color: #28a745;">✓ Full AI/ML Analysis Complete</p>';
+      html += '<ul style="font-size: 12px; margin: 10px 0; padding-left: 20px;">';
+      html += '<li>🤖 Machine Learning predictions</li>';
+      html += '<li>📝 Natural Language Processing</li>';
+      html += '<li>🖼️ Vision analysis</li>';
+      html += '<li>💡 Explainable AI insights</li>';
+      html += '</ul>';
+      
+      if (data.ai_ml_results) {
+        const status = data.ai_ml_results.status;
+        if (status === 'AI/ML analysis completed') {
+          html += '<p style="font-size: 11px; color: #666; margin-top: 10px;">Advanced analysis techniques applied to detect complex accessibility issues.</p>';
+        } else {
+          html += `<p style="font-size: 11px; color: #856404; margin-top: 10px;">${status}</p>`;
+        }
+      }
+    } else {
+      html += '<p style="color: #856404;">⚠ AI/ML Features Not Enabled</p>';
+      html += '<p style="font-size: 11px;">AI/ML libraries are not installed on the server.</p>';
+      html += '<p style="font-size: 11px;">Current analysis uses rule-based checks only.</p>';
+      html += '<details style="font-size: 11px; margin-top: 10px;"><summary style="cursor: pointer; color: #667eea;">How to enable AI/ML</summary>';
+      html += '<code style="display: block; background: #f4f4f4; padding: 5px; margin-top: 5px;">pip install transformers torch scikit-learn pillow</code>';
+      html += '</details>';
+    }
+    
     aiStatusDiv.innerHTML = html;
   }
   
   function showError(message) {
     statusDiv.innerHTML = `<p>✗ ${message}</p>`;
     statusDiv.className = 'status error';
+  }
+  
+  // Capture screenshot with highlighted errors
+  async function captureScreenshotWithHighlights(tabId, issues) {
+    try {
+      // Calculate total issues
+      const totalIssues = Object.values(issues).reduce((sum, arr) => sum + arr.length, 0);
+      if (totalIssues === 0) {
+        return null; // No issues to highlight
+      }
+      
+      // Highlight the failing elements
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'highlightElements',
+        issues: issues
+      });
+      
+      // Wait a bit for highlights to render
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Capture the screenshot
+      const screenshot = await chrome.tabs.captureVisibleTab(null, {
+        format: 'png',
+        quality: 95
+      });
+      
+      // Remove highlights after a delay
+      setTimeout(async () => {
+        try {
+          await chrome.tabs.sendMessage(tabId, {
+            action: 'removeHighlights'
+          });
+        } catch (e) {
+          // Tab might be closed, ignore
+        }
+      }, 1000);
+      
+      return screenshot;
+    } catch (error) {
+      console.error('Screenshot capture error:', error);
+      return null;
+    }
+  }
+  
+  // Display screenshot in popup
+  function displayScreenshot(screenshotUrl) {
+    const existingScreenshot = document.querySelector('.screenshot-section');
+    if (existingScreenshot) {
+      existingScreenshot.remove();
+    }
+    
+    const screenshotSection = document.createElement('div');
+    screenshotSection.className = 'screenshot-section';
+    screenshotSection.innerHTML = `
+      <h3>📸 Error Screenshot</h3>
+      <div class="screenshot-container">
+        <img src="${screenshotUrl}" alt="Screenshot with highlighted errors" 
+             style="width: 100%; border-radius: 4px; border: 1px solid #ddd; cursor: pointer;"
+             onclick="window.open('${screenshotUrl}', '_blank')">
+        <p style="font-size: 11px; color: #666; margin-top: 5px; text-align: center;">
+          Failing elements are highlighted in red with numbered badges. Click to enlarge.
+        </p>
+      </div>
+    `;
+    
+    const quickChecks = document.getElementById('quickChecks');
+    if (quickChecks && quickChecks.firstChild) {
+      quickChecks.insertBefore(screenshotSection, quickChecks.firstChild);
+    }
   }
   
   function viewFullReport() {
@@ -255,10 +356,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
   
-  function downloadReport() {
+  async function downloadReport() {
     // Use stored page data for report generation
     if (currentPageData) {
-      const reportHtml = generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks);
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // Capture screenshot for the report
+      let screenshotUrl = null;
+      if (currentPageData.clientChecks) {
+        screenshotUrl = await captureScreenshotWithHighlights(tab.id, currentPageData.clientChecks);
+      }
+      
+      const reportHtml = generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks, screenshotUrl);
       downloadHtmlFile(reportHtml, `accessibility_report_${Date.now()}.html`);
       return;
     }
@@ -272,7 +381,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
   
-  function generateClientReport(url, title, checks) {
+  function generateClientReport(url, title, checks, screenshotUrl = null) {
     const timestamp = new Date().toLocaleString();
     const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
     
@@ -383,8 +492,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         <p><strong>Generated:</strong> ${timestamp}</p>
         <p><em>Client-side analysis</em></p>
     </div>
-    
-    <div class="summary">
+        ${screenshotUrl ? `
+    <div class="summary" style="background: #fff3cd; border-left: 4px solid #ff9800;">
+        <h2>📸 Error Screenshot</h2>
+        <p style="color: #856404; margin-bottom: 15px;">Failing elements are highlighted in red with numbered badges corresponding to the issue numbers below.</p>
+        <img src="${screenshotUrl}" alt="Screenshot with highlighted errors" 
+             style="width: 100%; max-width: 100%; border-radius: 8px; border: 2px solid #f57c00; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+    </div>
+    ` : ''}
+        <div class="summary">
         <h2>Summary</h2>
         <div class="summary-item">
             <span>Total Issues Found:</span>

@@ -265,3 +265,30 @@ body {
   font-style: italic;
 }
 
+.screenshot-section {
+  margin-top: 15px;
+  padding: 12px;
+  background: #fff3cd;
+  border-radius: 8px;
+  border-left: 4px solid #ff9800;
+}
+
+.screenshot-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #f57c00;
+}
+
+.screenshot-container {
+  margin-top: 10px;
+}
+
+.screenshot-container img {
+  transition: transform 0.2s;
+}
+
+.screenshot-container img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+

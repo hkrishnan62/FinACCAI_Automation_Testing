@@ -143,5 +143,153 @@ function performClientSideChecks() {
   return issues;
 }
 
+// Highlight failing elements on the page
+function highlightFailingElements(issuesData) {
+  // Remove any existing highlights first
+  removeHighlights();
+  
+  const highlightedElements = [];
+  let errorCount = 0;
+  
+  // Process each category of issues
+  const allElements = [];
+  
+  // Images
+  if (issuesData.images) {
+    document.querySelectorAll('img').forEach((img, index) => {
+      if (issuesData.images.some(issue => issue.index === index)) {
+        allElements.push({ element: img, type: 'Image Missing Alt' });
+      }
+    });
+  }
+  
+  // Inputs
+  if (issuesData.inputs) {
+    document.querySelectorAll('input').forEach((input, index) => {
+      const type = (input.getAttribute('type') || '').toLowerCase();
+      if (!['hidden', 'submit', 'button', 'image', 'reset'].includes(type)) {
+        if (issuesData.inputs.some(issue => issue.index === index)) {
+          allElements.push({ element: input, type: 'Input Missing Label' });
+        }
+      }
+    });
+  }
+  
+  // Links
+  if (issuesData.links) {
+    document.querySelectorAll('a').forEach((link, index) => {
+      if (issuesData.links.some(issue => issue.index === index)) {
+        allElements.push({ element: link, type: 'Link Issue' });
+      }
+    });
+  }
+  
+  // Headings
+  if (issuesData.headings) {
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading, index) => {
+      if (issuesData.headings.some(issue => issue.index === index)) {
+        allElements.push({ element: heading, type: 'Heading Hierarchy' });
+      }
+    });
+  }
+  
+  // ARIA
+  if (issuesData.aria) {
+    document.querySelectorAll('[role]').forEach((element, index) => {
+      if (issuesData.aria.some(issue => issue.index === index)) {
+        allElements.push({ element: element, type: 'ARIA Issue' });
+      }
+    });
+  }
+  
+  // Create highlights for each element
+  allElements.forEach((item, index) => {
+    errorCount++;
+    const element = item.element;
+    
+    // Create highlight overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'finaccai-error-highlight';
+    overlay.setAttribute('data-finaccai-highlight', 'true');
+    overlay.style.cssText = `
+      position: absolute;
+      border: 3px solid #ff4444;
+      background: rgba(255, 68, 68, 0.15);
+      pointer-events: none;
+      z-index: 999999;
+      box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+      transition: all 0.3s ease;
+    `;
+    
+    // Create error badge
+    const badge = document.createElement('div');
+    badge.className = 'finaccai-error-badge';
+    badge.setAttribute('data-finaccai-highlight', 'true');
+    badge.textContent = errorCount.toString();
+    badge.title = item.type;
+    badge.style.cssText = `
+      position: absolute;
+      top: -12px;
+      left: -12px;
+      width: 24px;
+      height: 24px;
+      background: #ff4444;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 12px;
+      font-family: Arial, sans-serif;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 1000000;
+    `;
+    
+    // Position the overlay
+    const rect = element.getBoundingClientRect();
+    overlay.style.top = (rect.top + window.scrollY) + 'px';
+    overlay.style.left = (rect.left + window.scrollX) + 'px';
+    overlay.style.width = Math.max(rect.width, 20) + 'px';
+    overlay.style.height = Math.max(rect.height, 20) + 'px';
+    
+    overlay.appendChild(badge);
+    document.body.appendChild(overlay);
+    
+    highlightedElements.push(overlay);
+  });
+  
+  return highlightedElements;
+}
+
+// Remove all highlights
+function removeHighlights() {
+  const highlights = document.querySelectorAll('[data-finaccai-highlight="true"]');
+  highlights.forEach(h => h.remove());
+}
+
+// Listen for highlight requests
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'highlightElements') {
+    try {
+      highlightFailingElements(request.issues);
+      sendResponse({ success: true });
+    } catch (error) {
+      sendResponse({ success: false, error: error.toString() });
+    }
+    return true;
+  }
+  
+  if (request.action === 'removeHighlights') {
+    try {
+      removeHighlights();
+      sendResponse({ success: true });
+    } catch (error) {
+      sendResponse({ success: false, error: error.toString() });
+    }
+    return true;
+  }
+});
+
 // Inject a notification when the extension is ready
 console.log('FinACCAI Accessibility Checker is ready');
