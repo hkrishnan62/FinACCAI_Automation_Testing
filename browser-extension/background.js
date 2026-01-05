@@ -42,7 +42,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         body: JSON.stringify({
           html: request.html,
           url: request.url,
-          title: request.title
+          title: request.title,
+          level: request.level || 'AAA',
+          screenshot: request.screenshot || null
         }),
         timeout: 30000
       })

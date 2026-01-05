@@ -48,6 +48,20 @@ document.addEventListener('DOMContentLoaded', async function() {
   viewFullReportBtn.addEventListener('click', viewFullReport);
   downloadReportBtn.addEventListener('click', downloadReport);
   
+  // Update level description when dropdown changes
+  const levelSelect = document.getElementById('levelSelect');
+  const levelInfo = document.querySelector('.level-info');
+  if (levelSelect && levelInfo) {
+    levelSelect.addEventListener('change', function() {
+      const descriptions = {
+        'A': 'Minimum accessibility - Basic requirements for all web content',
+        'AA': 'Standard compliance - Meets most accessibility needs (4.5:1 contrast)',
+        'AAA': 'Enhanced accessibility - Highest level with strict requirements (7:1 contrast)'
+      };
+      levelInfo.textContent = descriptions[this.value] || descriptions['AAA'];
+    });
+  }
+  
   async function analyzePage() {
     analyzeBtn.disabled = true;
     statusDiv.innerHTML = '<div class="spinner"></div><p>Analyzing current page...</p>';
@@ -100,17 +114,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Display client-side check results
         displayQuickChecks(response.clientChecks);
         
-        // Capture full page screenshot
-        statusDiv.textContent = '📸 Capturing full page screenshot...';
-        const fullPageScreenshot = await captureFullPageScreenshot(tab.id);
-        if (fullPageScreenshot) {
-          displayScreenshot(fullPageScreenshot);
+        // Highlight issues on the page
+        statusDiv.textContent = '🎯 Highlighting issues on page...';
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: 'highlightElements',
+            issues: response.clientChecks
+          });
+          // Wait for highlights to render
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (e) {
+          console.warn('Could not highlight elements:', e);
+        }
+        
+        // Capture full page screenshot WITH HIGHLIGHTS
+        statusDiv.textContent = '📸 Capturing screenshot with highlighted issues...';
+        let screenshotData = null;
+        try {
+          const screenshotBase64 = await captureFullPageScreenshot(tab.id);
+          if (screenshotBase64) {
+            // Remove data:image/png;base64, prefix if present
+            screenshotData = screenshotBase64.replace(/^data:image\/png;base64,/, '');
+            displayScreenshot(screenshotBase64);
+          }
+        } catch (e) {
+          console.warn('Screenshot capture failed:', e);
         }
         
         statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI analysis...</p>';
         
         // Try direct API call first (faster, works from extension context)
         const apiUrl = await testAPIConnection();
+        // Get selected WCAG level from dropdown
+        const selectedLevel = document.getElementById('levelSelect') ? document.getElementById('levelSelect').value : 'AAA';
+        
         if (apiUrl) {
           try {
             const backendResponse = await fetch(apiUrl, {
@@ -121,7 +158,9 @@ document.addEventListener('DOMContentLoaded', async function() {
               body: JSON.stringify({
                 html: response.html,
                 url: response.url,
-                title: response.title
+                title: response.title,
+                level: selectedLevel,
+                screenshot: screenshotData
               })
             });
             
@@ -147,7 +186,9 @@ document.addEventListener('DOMContentLoaded', async function() {
           action: 'analyzeWithBackend',
           html: response.html,
           url: response.url,
-          title: response.title
+          title: response.title,
+          level: selectedLevel,
+          screenshot: screenshotData
         }, (backendResponse) => {
           analyzeBtn.disabled = false;
           

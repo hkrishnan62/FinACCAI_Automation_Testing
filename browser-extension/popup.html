@@ -10,15 +10,34 @@
   <div class="container">
     <div class="header">
       <h1>FinACCAI</h1>
-      <p class="subtitle">Accessibility Checker</p>
+      <p class="subtitle">AI-Powered Accessibility Checker</p>
     </div>
     
     <div class="content">
-      <div id="status" class="status">
-        <p>Click "Analyze Page" for a full accessibility scan</p>
+      <!-- Validation Level Selector -->
+      <div class="section level-selector">
+        <label for="levelSelect" class="level-label">
+          <strong>WCAG Validation Level:</strong>
+        </label>
+        <select id="levelSelect" class="level-dropdown">
+          <option value="A">Level A - Minimum (Basic)</option>
+          <option value="AA" selected>Level AA - Standard (Recommended)</option>
+          <option value="AAA">Level AAA - Enhanced (Strictest)</option>
+        </select>
+        <div class="level-info">
+          <small id="levelDescription">
+            Level AA: Standard compliance for most websites (4.5:1 contrast)
+          </small>
+        </div>
       </div>
       
-      <button id="analyzeBtn" class="analyze-btn">Analyze Page</button>
+      <div id="status" class="status">
+        <p>Select a validation level and click "Analyze Page"</p>
+      </div>
+      
+      <button id="analyzeBtn" class="analyze-btn">
+        <span class="btn-icon">🔍</span> Analyze Page
+      </button>
       
       <div id="results" class="results hidden">
         <div class="section">

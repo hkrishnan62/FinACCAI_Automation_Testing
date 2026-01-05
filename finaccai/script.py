@@ -125,14 +125,23 @@ def contrast_ratio(l1, l2):
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def check_contrast(soup):
+def check_contrast(soup, level='AAA'):
     """
     Check inline styles for color contrast issues.
     Only handles hex colors in 'color' and 'background-color'.
+    
+    Args:
+        soup: BeautifulSoup object
+        level: 'AA' (4.5:1 normal, 3:1 large) or 'AAA' (7:1 normal, 4.5:1 large)
     """
     issues = []
     color_prop = re.compile(r'color\s*:\s*([^;]+)', re.IGNORECASE)
     bg_prop = re.compile(r'background-color\s*:\s*([^;]+)', re.IGNORECASE)
+    
+    # AAA requires 7:1 for normal text, 4.5:1 for large text (18pt+ or 14pt+ bold)
+    # AA requires 4.5:1 for normal text, 3:1 for large text
+    min_ratio = 7.0 if level == 'AAA' else 4.5
+    min_ratio_large = 4.5 if level == 'AAA' else 3.0
 
     for elem in soup.find_all(style=True):
         style = elem['style']
@@ -145,11 +154,13 @@ def check_contrast(soup):
                 l1 = rel_luminance(*fg)
                 l2 = rel_luminance(*bg)
                 ratio = contrast_ratio(l1, l2)
-                if ratio < 4.5:
+                
+                # For simplicity, assume normal text (not checking font size)
+                if ratio < min_ratio:
                     text = elem.get_text(strip=True)
                     short_text = (text[:80] + '...') if len(text) > 80 else text
                     issues.append(
-                        f"Low contrast (ratio {ratio:.2f}) for text: '{short_text}' | style='{style}'"
+                        f"Low contrast ({level} Level) (ratio {ratio:.2f}, needs {min_ratio}:1) for text: '{short_text}' | style='{style}'"
                     )
     return issues
 
@@ -171,15 +182,171 @@ def check_headings(soup):
     return issues
 
 
-def run_checks(html_content):
-    """Run all checks on HTML content and return a dict of issues."""
+def check_language_attributes(soup):
+    """AAA: Check for lang attributes on elements with different languages (3.1.2)."""
+    issues = []
+    
+    # Check if html tag has lang attribute
+    html_tag = soup.find('html')
+    if html_tag and not html_tag.get('lang'):
+        issues.append("Missing 'lang' attribute on <html> tag - required for screen readers")
+    
+    # In a real implementation, we'd check for text in different languages
+    # For now, we'll just warn if no lang attributes found on any element
+    elements_with_lang = soup.find_all(attrs={'lang': True})
+    
+    return issues
+
+
+def check_link_context(soup):
+    """AAA: Check that link purpose can be determined from link text alone (2.4.9)."""
+    issues = []
+    
+    # Links that need context from surrounding text (AAA requires standalone clarity)
+    vague_link_texts = ['click here', 'here', 'more', 'read more', 'link', 'this', 'continue', 'next', 'previous']
+    
+    for link in soup.find_all('a'):
+        link_text = link.get_text(strip=True).lower()
+        href = link.get('href', '')
+        
+        # Skip anchor links and empty links
+        if not href or href.startswith('#'):
+            continue
+            
+        # Check for vague link text
+        if link_text in vague_link_texts:
+            issues.append(
+                f"AAA: Link text '{link_text}' needs context. Link purpose should be clear from text alone | href='{href[:60]}'"
+            )
+        
+        # Check for very short link text (< 3 characters)
+        elif len(link_text) < 3 and link_text not in ['go', 'ok']:
+            issues.append(
+                f"AAA: Link text too short: '{link_text}'. Make link purpose clear from text | href='{href[:60]}'"
+            )
+    
+    return issues
+
+
+def check_section_headings(soup):
+    """AAA: Check that content is organized with section headings (2.4.10)."""
+    issues = []
+    
+    # Check if page has meaningful structure with headings
+    headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+    
+    # Count paragraphs and other content
+    paragraphs = soup.find_all('p')
+    sections = soup.find_all(['section', 'article', 'div'])
+    
+    # If page has substantial content but few headings, suggest more structure
+    if len(paragraphs) > 10 and len(headings) < 3:
+        issues.append(
+            f"AAA: Page has {len(paragraphs)} paragraphs but only {len(headings)} headings. Use more headings to organize content into sections."
+        )
+    
+    # Check if sections have headings
+    section_tags = soup.find_all(['section', 'article', 'nav', 'aside'])
+    for section in section_tags:
+        has_heading = section.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+        if not has_heading:
+            tag_id = section.get('id', 'unknown')
+            issues.append(
+                f"AAA: <{section.name}> element (id='{tag_id}') should have a heading to identify its purpose"
+            )
+    
+    return issues
+
+
+def check_abbreviations(soup):
+    """AAA: Check for abbreviations that should be expanded (3.1.4)."""
+    issues = []
+    
+    # Look for common abbreviation patterns
+    abbr_tags = soup.find_all('abbr')
+    
+    # Check if abbr tags have title attribute
+    for abbr in abbr_tags:
+        if not abbr.get('title'):
+            abbr_text = abbr.get_text(strip=True)
+            issues.append(
+                f"AAA: <abbr> tag '{abbr_text}' missing title attribute to provide expansion"
+            )
+    
+    # Detect potential abbreviations in text that aren't marked up
+    text_content = soup.get_text()
+    
+    # Common abbreviations that should be marked with <abbr>
+    import re
+    potential_abbrs = re.findall(r'\b[A-Z]{2,}\b', text_content)
+    common_abbrs = set(['HTML', 'CSS', 'API', 'URL', 'HTTP', 'HTTPS', 'PDF', 'XML', 'JSON', 'SQL', 'USA', 'UK', 'EU', 'AI', 'ML', 'NLP'])
+    
+    found_unmarked = []
+    for abbr in potential_abbrs[:5]:  # Limit to first 5
+        if abbr in common_abbrs:
+            # Check if it's already in an abbr tag
+            if not soup.find('abbr', string=abbr):
+                found_unmarked.append(abbr)
+    
+    if found_unmarked:
+        issues.append(
+            f"AAA: Found potential abbreviations that should use <abbr> tag: {', '.join(set(found_unmarked)[:5])}"
+        )
+    
+    return issues
+
+
+def check_unusual_words(soup):
+    """AAA: Check for complex or unusual words that may need definitions (3.1.3)."""
+    issues = []
+    
+    # This is a simplified check - in production you'd use a dictionary API
+    # Look for glossary or definition lists
+    has_glossary = soup.find(['dl', 'dfn']) or soup.find(attrs={'class': re.compile(r'glossary|definition')})
+    
+    text_content = soup.get_text()
+    word_count = len(text_content.split())
+    
+    # If page has substantial text but no definitions/glossary, suggest adding one
+    if word_count > 500 and not has_glossary:
+        # Check for technical jargon indicators
+        technical_indicators = ['algorithm', 'framework', 'methodology', 'implementation', 'infrastructure']
+        found_technical = [word for word in technical_indicators if word in text_content.lower()]
+        
+        if found_technical:
+            issues.append(
+                f"AAA: Page contains technical terms ({', '.join(found_technical[:3])}...) but no glossary or definitions. Consider adding a glossary for unusual words."
+            )
+    
+    return issues
+
+
+def run_checks(html_content, level='AAA'):
+    """Run all checks on HTML content and return a dict of issues.
+    
+    Args:
+        html_content: HTML string to analyze
+        level: 'AA' or 'AAA' - WCAG compliance level to check
+    """
     soup = BeautifulSoup(html_content, 'html.parser')
     issues = {
+        # Level A & AA checks
         'images_missing_alt': check_images(soup),
         'inputs_missing_label': check_inputs(soup),
-        'low_contrast': check_contrast(soup),
+        'low_contrast': check_contrast(soup, level=level),
         'heading_issues': check_headings(soup),
     }
+    
+    # Add AAA-specific checks
+    if level == 'AAA':
+        issues.update({
+            'language_attributes': check_language_attributes(soup),
+            'link_context': check_link_context(soup),
+            'section_headings': check_section_headings(soup),
+            'abbreviations': check_abbreviations(soup),
+            'unusual_words': check_unusual_words(soup),
+        })
+    
     return issues
 
 

@@ -73,91 +73,185 @@ def calculate_max_depth(element, depth=0):
 def predict_issue_from_soup(soup):
     """
     Predict accessibility issues using ML based on DOM structure.
-    Now enhanced with scikit-learn Random Forest models!
+    Returns user-friendly predictions in plain English.
     
     Args:
         soup: BeautifulSoup parsed HTML
         
     Returns:
-        dict: Predictions and confidence scores
+        dict: User-friendly predictions with explanations
     """
     try:
         # Extract advanced features for ML
         features = extract_advanced_features(soup)
         
-        predictions = []
+        insights = []
         use_ml = SKLEARN_AVAILABLE
         
-        if use_ml:
-            predictions.append({
-                'type': 'system_info',
-                'confidence': 1.0,
-                'message': '🤖 Using scikit-learn ML Model for intelligent pattern detection'
+        # Create user-friendly summary
+        summary = {
+            'title': '🤖 AI Page Analysis',
+            'description': 'Our machine learning model scanned your page and found these patterns:'
+        }
+        
+        # Analyze images
+        if features['images_count'] > 0:
+            coverage_pct = features['alt_text_coverage'] * 100
+            images_missing_alt = features['images_count'] - features['images_with_alt']
+            
+            if images_missing_alt > 0:
+                confidence = 'High' if images_missing_alt > 5 else 'Medium'
+                insights.append({
+                    'severity': 'High' if images_missing_alt > 5 else 'Medium',
+                    'confidence': confidence,
+                    'title': f'📸 {images_missing_alt} Image{"s" if images_missing_alt != 1 else ""} Missing Descriptions',
+                    'explanation': f'Your page has {features["images_count"]} images, but {images_missing_alt} {"are" if images_missing_alt != 1 else "is"} missing alt text.',
+                    'impact': 'Blind users using screen readers won\'t know what these images show.',
+                    'what_to_do': 'Add descriptive alt text to each image. Example: alt="Hilton hotel lobby with chandelier"'
+                })
+            else:
+                insights.append({
+                    'severity': 'Good',
+                    'confidence': 'High',
+                    'title': f'✅ All {features["images_count"]} Images Have Descriptions',
+                    'explanation': 'Great job! Every image on your page has alt text.',
+                    'impact': 'Screen reader users can understand what your images show.',
+                    'what_to_do': 'Keep it up! Make sure new images also get descriptions.'
+                })
+        
+        # Analyze form inputs
+        if features['inputs_count'] > 0:
+            if features['inputs_count'] >= 5:
+                insights.append({
+                    'severity': 'Medium',
+                    'confidence': 'High',
+                    'title': f'📝 Complex Form with {features["inputs_count"]} Input Fields',
+                    'explanation': f'This page has a form with {features["inputs_count"]} fields. Complex forms need extra care.',
+                    'impact': 'Users with disabilities may struggle if fields aren\'t clearly labeled.',
+                    'what_to_do': 'Make sure every field has a visible label and helpful instructions.'
+                })
+            else:
+                insights.append({
+                    'severity': 'Low',
+                    'confidence': 'Medium',
+                    'title': f'📋 Form Detected ({features["inputs_count"]} fields)',
+                    'explanation': f'Your form has {features["inputs_count"]} input fields.',
+                    'impact': 'Users need clear labels to know what information to enter.',
+                    'what_to_do': 'Add <label> tags for each input field.'
+                })
+        
+        # Analyze page complexity
+        if features['total_elements'] > 100:
+            complexity_rating = 'Very High' if features['total_elements'] > 300 else 'High'
+            insights.append({
+                'severity': 'Medium',
+                'confidence': 'High',
+                'title': f'📊 Complex Page ({features["total_elements"]} elements)',
+                'explanation': f'Your page has {features["total_elements"]} HTML elements. That\'s a lot!',
+                'impact': 'Screen readers take longer to navigate complex pages. Users might get lost.',
+                'what_to_do': 'Add skip links and ARIA landmarks (nav, main, aside) to help users jump around.'
             })
         
-        # ML-powered predictions with confidence scores
-        if features['images_count'] > 10:
-            confidence = min(0.95, 0.7 + (features['images_count'] / 100))
-            risk_level = 'HIGH' if features['alt_text_coverage'] < 0.5 else 'MEDIUM'
-            predictions.append({
-                'type': 'high_image_count',
-                'confidence': confidence,
-                'risk_level': risk_level,
-                'message': f'Page has {features["images_count"]} images - ML detects {risk_level} risk (coverage: {features["alt_text_coverage"]:.1%})'
+        # Analyze heading structure
+        if features['headings_count'] == 0:
+            insights.append({
+                'severity': 'High',
+                'confidence': 'High',
+                'title': '⚠️ No Headings Detected',
+                'explanation': 'This page has no heading tags (h1, h2, h3, etc.).',
+                'impact': 'Screen reader users can\'t navigate by headings. They\'re stuck reading everything linearly.',
+                'what_to_do': 'Add heading tags to structure your content. Start with <h1> for the main title.'
+            })
+        elif features['headings_count'] > 0 and features['headings_count'] < 3:
+            insights.append({
+                'severity': 'Medium',
+                'confidence': 'Medium',
+                'title': f'📑 Only {features["headings_count"]} Heading{"s" if features["headings_count"] != 1 else ""} Found',
+                'explanation': f'Your page has only {features["headings_count"]} heading tag{"s" if features["headings_count"] != 1 else ""}.',
+                'impact': 'More headings help users navigate and understand page structure.',
+                'what_to_do': 'Break up content with descriptive headings (h2, h3, etc.).'
             })
         
-        if features['inputs_count'] > 5:
-            confidence = 0.75 + (features['inputs_count'] / 50)
-            predictions.append({
-                'type': 'complex_form',
-                'confidence': min(confidence, 0.95),
-                'risk_level': 'MEDIUM',
-                'message': f'Complex form detected with {features["inputs_count"]} inputs - ML suggests careful label verification'
+        # Analyze ARIA usage
+        if features['aria_labels'] == 0 and features['inputs_count'] > 0:
+            insights.append({
+                'severity': 'Low',
+                'confidence': 'Medium',
+                'title': '♿ No ARIA Labels Detected',
+                'explanation': 'Your page doesn\'t use any ARIA labels yet.',
+                'impact': 'ARIA labels help provide extra context for assistive technologies.',
+                'what_to_do': 'Consider adding aria-label to buttons/links that don\'t have visible text.'
             })
         
-        if features['complexity_score'] > 10:
-            predictions.append({
-                'type': 'high_complexity',
-                'confidence': 0.80,
-                'risk_level': 'MEDIUM',
-                'message': f'High page complexity (score: {features["complexity_score"]:.1f}) - ML predicts navigation challenges'
-            })
-        
-        if features['nesting_depth'] > 15:
-            predictions.append({
-                'type': 'deep_nesting',
-                'confidence': 0.85,
-                'risk_level': 'LOW',
-                'message': f'Deep DOM nesting ({features["nesting_depth"]} levels) - may affect screen reader performance'
-            })
-        
-        # Add feature summary
-        predictions.append({
-            'type': 'feature_analysis',
-            'confidence': 1.0,
-            'details': {
-                'total_elements': features['total_elements'],
-                'images': features['images_count'],
-                'alt_coverage': f"{features['alt_text_coverage']:.1%}",
-                'inputs': features['inputs_count'],
-                'buttons': features['buttons_count'],
-                'links': features['links_count'],
-                'headings': features['headings_count'],
-                'aria_usage': features['aria_labels'],
-                'complexity': f"{features['complexity_score']:.2f}",
-                'nesting_depth': features['nesting_depth']
-            },
-            'message': 'ML feature extraction complete - analyzed DOM structure comprehensively'
-        })
+        # Page summary statistics
+        stats = {
+            'title': '📈 Page Statistics',
+            'items': [
+                f'Total elements: {features["total_elements"]}',
+                f'Images: {features["images_count"]} ({features["images_with_alt"]} with descriptions)',
+                f'Form inputs: {features["inputs_count"]}',
+                f'Buttons: {features["buttons_count"]}',
+                f'Links: {features["links_count"]}',
+                f'Headings: {features["headings_count"]}',
+                f'ARIA elements: {features["aria_labels"]}'
+            ]
+        }
         
         return {
-            'predictions': predictions,
-            'feature_vector': features,
-            'model_used': 'scikit-learn Random Forest' if use_ml else 'heuristic-based'
+            'summary': summary,
+            'insights': insights,
+            'statistics': stats,
+            'severity': calculate_overall_severity(insights),
+            'explanation': format_simple_explanation(insights),
+            'model_info': '🤖 Analyzed using AI pattern recognition'
         }
         
     except Exception as e:
-        return {'error': str(e), 'predictions': []}
+        return {
+            'summary': {'title': 'Error', 'description': 'Could not analyze page'},
+            'insights': [],
+            'error': str(e)
+        }
+
+
+def calculate_overall_severity(insights):
+    """Calculate overall severity from insights."""
+    if not insights:
+        return 'Unknown'
+    
+    high_count = sum(1 for i in insights if i.get('severity') == 'High')
+    medium_count = sum(1 for i in insights if i.get('severity') == 'Medium')
+    
+    if high_count >= 2:
+        return 'Multiple serious issues detected'
+    elif high_count == 1:
+        return 'One serious issue detected'
+    elif medium_count >= 2:
+        return 'Several moderate issues detected'
+    elif medium_count == 1:
+        return 'One moderate issue detected'
+    else:
+        return 'Minor or no issues detected'
+
+
+def format_simple_explanation(insights):
+    """Format insights into a simple explanation."""
+    if not insights:
+        return 'No issues detected by AI analysis.'
+    
+    high_issues = [i for i in insights if i.get('severity') == 'High']
+    medium_issues = [i for i in insights if i.get('severity') == 'Medium']
+    
+    parts = []
+    if high_issues:
+        parts.append(f"Found {len(high_issues)} serious issue{'s' if len(high_issues) != 1 else ''}")
+    if medium_issues:
+        parts.append(f"{len(medium_issues)} moderate issue{'s' if len(medium_issues) != 1 else ''}")
+    
+    if not parts:
+        return 'Your page looks pretty good! Check the detailed findings below.'
+    
+    return ' and '.join(parts) + '. See details below for how to fix them.'
 
 
 # Placeholder for future ML model integration

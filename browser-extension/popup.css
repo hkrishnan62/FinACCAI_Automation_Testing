@@ -39,6 +39,62 @@ body {
   flex: 1;
 }
 
+/* Level Selector Styles */
+.level-selector {
+  margin-bottom: 15px;
+  padding: 15px;
+}
+
+.level-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-size: 14px;
+}
+
+.level-dropdown {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 2px solid #667eea;
+  border-radius: 6px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.level-dropdown:hover {
+  border-color: #5568d3;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.level-dropdown:focus {
+  outline: none;
+  border-color: #5568d3;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.level-dropdown option {
+  padding: 10px;
+  font-weight: 500;
+}
+
+.level-info {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #667eea;
+}
+
+.level-info small {
+  color: #666;
+  line-height: 1.4;
+  display: block;
+}
+
 .status {
   background: white;
   border-radius: 8px;
@@ -78,6 +134,14 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  font-size: 18px;
 }
 
 .analyze-btn:hover {

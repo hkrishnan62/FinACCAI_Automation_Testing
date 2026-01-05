@@ -52,9 +52,7 @@ def analyze_text(soup):
     try:
         findings = []
         use_ai = TRANSFORMERS_AVAILABLE and sentiment_analyzer is not None
-        
-        if use_ai:
-            findings.append("🤖 Using BERT AI Model for advanced text analysis")
+        issue_count = 0
         
         # Analyze form labels with AI enhancement
         labels = soup.find_all("label")
@@ -68,13 +66,16 @@ def analyze_text(soup):
             if use_ai and len(text) > 3:
                 ai_result = analyze_text_with_bert(text)
                 if ai_result and ai_result['quality'] == 'needs_improvement':
-                    findings.append(f"AI detected unclear label: '{text}' (confidence: {ai_result['confidence']:.2f})")
+                    issue_count += 1
+                    findings.append(f"❌ Confusing label text: '{text}' - Users may not understand what this field is for")
             
             # Traditional checks
             if text and len(text) < 3:
-                findings.append(f"Very short label text: '{text}' - may not be descriptive enough")
+                issue_count += 1
+                findings.append(f"❌ Too short: '{text}' - Add more words so users know what to enter")
             elif any(word in text_lower for word in vague_words) and len(text.split()) < 3:
-                findings.append(f"Potentially vague label: '{text}' - could be more descriptive")
+                issue_count += 1
+                findings.append(f"❌ Unclear label: '{text}' - Be more specific about what information is needed")
         
         # Analyze button text with AI
         buttons = soup.find_all("button")
@@ -83,28 +84,41 @@ def analyze_text(soup):
             text_lower = text.lower()
             
             if not text:
-                findings.append("Button with no text - needs descriptive text")
+                issue_count += 1
+                findings.append("❌ Empty button - Add text that explains what the button does")
             elif text_lower in ['click', 'submit', 'ok', 'go']:
-                findings.append(f"Button text '{text}' could be more descriptive")
+                issue_count += 1
+                findings.append(f"❌ Vague button: '{text}' - Say what happens when clicked (e.g., 'Submit Form', 'Search Articles')")
             elif use_ai and len(text) > 2:
                 ai_result = analyze_text_with_bert(text)
                 if ai_result and ai_result['descriptiveness'] == 'low':
-                    findings.append(f"AI suggests button text '{text}' could be more descriptive")
+                    issue_count += 1
+                    findings.append(f"⚠️ Button '{text}' could be clearer - Explain the button's purpose more specifically")
         
         # Analyze link text with AI
         links = soup.find_all("a")
         non_descriptive = ['click here', 'here', 'read more', 'more', 'link']
+        link_issues = 0
         for link in links:
             text = link.get_text().strip().lower()
             if text in non_descriptive:
-                findings.append(f"Non-descriptive link text: '{text}'")
+                link_issues += 1
+                if link_issues <= 5:  # Only show first 5 to avoid spam
+                    issue_count += 1
+                    findings.append(f"❌ Unhelpful link: '{text}' - Link text should describe where it goes")
         
-        # Overall page text analysis
-        all_text = soup.get_text()
-        if len(all_text.strip()) < 100:
-            findings.append("Page has very little text content - may impact accessibility")
+        if link_issues > 5:
+            findings.append(f"⚠️ Found {link_issues} more links with unclear text - consider making them more descriptive")
         
-        return findings if findings else ["No significant text quality issues detected"]
+        # Add summary at the top
+        if use_ai and issue_count > 0:
+            findings.insert(0, f"🤖 AI found {issue_count} text clarity issues that may confuse users")
+        elif issue_count > 0:
+            findings.insert(0, f"Found {issue_count} text clarity issues")
+        else:
+            findings.append("✅ All text appears clear and descriptive")
+        
+        return findings
         
     except Exception as e:
         return [f"NLP analysis error: {str(e)}"]
