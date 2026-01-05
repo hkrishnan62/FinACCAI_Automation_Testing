@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Test - FinACCAI Extension</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 { color: #667eea; text-align: center; }
+    .test-item {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f8f9fa;
+      border-left: 4px solid #dc3545;
+      border-radius: 4px;
+    }
+    .instruction {
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🧪 FinACCAI Extension Test</h1>
+    
+    <div class="instruction">
+      <strong>📋 How to test:</strong>
+      <ol>
+        <li>Make sure this page is loaded</li>
+        <li>Click the FinACCAI extension icon in your browser</li>
+        <li>Click "Analyze Page"</li>
+        <li>You should see issues detected below!</li>
+      </ol>
+    </div>
+    
+    <h2>Intentional Accessibility Issues:</h2>
+    
+    <div class="test-item">
+      <h3>Issue #1: Image without alt text</h3>
+      <img src="https://via.placeholder.com/100" alt="">
+      <p>☝️ This image has empty alt text</p>
+    </div>
+    
+    <div class="test-item">
+      <h3>Issue #2: Image with no alt attribute</h3>
+      <img src="https://via.placeholder.com/100">
+      <p>☝️ This image has no alt attribute at all</p>
+    </div>
+    
+    <div class="test-item">
+      <h3>Issue #3: Input without label</h3>
+      <input type="text" placeholder="Unlabeled input">
+      <p>☝️ This input field has no label</p>
+    </div>
+    
+    <div class="test-item">
+      <h3>Issue #4: Non-descriptive link</h3>
+      <a href="#">Click here</a>
+      <p>☝️ This link text is not descriptive</p>
+    </div>
+    
+    <div class="test-item">
+      <h3>Issue #5: Skipped heading level</h3>
+      <h1>Heading 1</h1>
+      <h4>Heading 4 (skipped h2 and h3!)</h4>
+      <p>☝️ Heading hierarchy is broken</p>
+    </div>
+    
+    <p style="text-align: center; margin-top: 40px; color: #666;">
+      <strong>Expected Results:</strong><br>
+      The extension should find at least 5 accessibility issues on this page.
+    </p>
+  </div>
+</body>
+</html>

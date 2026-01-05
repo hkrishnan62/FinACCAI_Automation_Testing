@@ -1,7 +1,7 @@
 // Popup script for FinACCAI extension
 let currentReport = null;
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   const analyzeBtn = document.getElementById('analyzeBtn');
   const statusDiv = document.getElementById('status');
   const resultsDiv = document.getElementById('results');
@@ -9,6 +9,19 @@ document.addEventListener('DOMContentLoaded', function() {
   const aiStatusDiv = document.getElementById('aiStatus');
   const viewFullReportBtn = document.getElementById('viewFullReport');
   const downloadReportBtn = document.getElementById('downloadReport');
+  
+  // Check current tab on load
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || 
+        tab.url.startsWith('chrome-extension://') || tab.url.startsWith('about:')) {
+      statusDiv.innerHTML = '<p>⚠️ Cannot analyze browser internal pages. Please navigate to a regular webpage.</p>';
+      statusDiv.className = 'status';
+      analyzeBtn.disabled = true;
+    }
+  } catch (e) {
+    console.log('Error checking tab:', e);
+  }
   
   analyzeBtn.addEventListener('click', analyzePage);
   viewFullReportBtn.addEventListener('click', viewFullReport);
@@ -24,10 +37,32 @@ document.addEventListener('DOMContentLoaded', function() {
       // Get the current tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
+      // Check if the page is a restricted page
+      if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || 
+          tab.url.startsWith('chrome-extension://') || tab.url.startsWith('about:')) {
+        showError('Cannot analyze browser internal pages. Please navigate to a regular webpage.');
+        analyzeBtn.disabled = false;
+        return;
+      }
+      
+      // Try to inject content script if it's not already loaded
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        });
+      } catch (e) {
+        // Content script might already be injected, continue
+        console.log('Content script injection:', e.message);
+      }
+      
+      // Wait a moment for content script to load
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Send message to content script to analyze the page
       chrome.tabs.sendMessage(tab.id, { action: 'analyzePage' }, async (response) => {
         if (chrome.runtime.lastError) {
-          showError('Could not connect to page. Try refreshing the page.');
+          showError('Could not connect to page. Please refresh the page and try again. Error: ' + chrome.runtime.lastError.message);
           analyzeBtn.disabled = false;
           return;
         }
