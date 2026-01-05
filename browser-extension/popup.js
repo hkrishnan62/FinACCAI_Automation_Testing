@@ -2,6 +2,26 @@
 let currentReport = null;
 let currentPageData = null;  // Store current page analysis data
 
+// Test API availability with multiple URLs
+async function testAPIConnection() {
+  const apiUrls = [
+    'http://localhost:5000/api/health',
+    'http://127.0.0.1:5000/api/health'
+  ];
+  
+  for (const url of apiUrls) {
+    try {
+      const response = await fetch(url, { method: 'GET' });
+      if (response.ok) {
+        return url.replace('/api/health', '/api/analyze');
+      }
+    } catch (e) {
+      // Try next URL
+    }
+  }
+  return null;
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
   const analyzeBtn = document.getElementById('analyzeBtn');
   const statusDiv = document.getElementById('status');
@@ -89,6 +109,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI analysis...</p>';
         
+        // Try direct API call first (faster, works from extension context)
+        const apiUrl = await testAPIConnection();
+        if (apiUrl) {
+          try {
+            const backendResponse = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                html: response.html,
+                url: response.url,
+                title: response.title
+              })
+            });
+            
+            if (backendResponse.ok) {
+              const data = await backendResponse.json();
+              analyzeBtn.disabled = false;
+              currentReport = data;
+              displayAIStatus(data);
+              statusDiv.innerHTML = '<p>✓ Full scan complete!</p>';
+              statusDiv.className = 'status success';
+              resultsDiv.classList.remove('hidden');
+              viewFullReportBtn.classList.remove('hidden');
+              downloadReportBtn.classList.remove('hidden');
+              return;
+            }
+          } catch (e) {
+            console.warn('Direct API call failed, trying service worker:', e);
+          }
+        }
+        
+        // Fallback: Use service worker
         chrome.runtime.sendMessage({
           action: 'analyzeWithBackend',
           html: response.html,
