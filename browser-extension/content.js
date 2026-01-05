@@ -268,6 +268,46 @@ function removeHighlights() {
   highlights.forEach(h => h.remove());
 }
 
+// Capture element with context for screenshot
+function captureElementContext(element) {
+  try {
+    const rect = element.getBoundingClientRect();
+    const scrollLeft = window.scrollX || window.pageXOffset;
+    const scrollTop = window.scrollY || window.pageYOffset;
+    
+    return {
+      top: rect.top + scrollTop - 50,      // Add 50px context above
+      left: Math.max(0, rect.left + scrollLeft - 50),
+      width: rect.width + 100,             // Add 50px context on each side
+      height: rect.height + 100,
+      elementTop: rect.top + scrollTop,
+      elementLeft: rect.left + scrollLeft,
+      elementWidth: rect.width,
+      elementHeight: rect.height
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Scroll to element and return coords
+function scrollToElement(element) {
+  try {
+    element.scrollIntoView({ behavior: 'auto', block: 'center' });
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const rect = element.getBoundingClientRect();
+        resolve({
+          scrolled: true,
+          rect: rect
+        });
+      }, 500);
+    });
+  } catch (e) {
+    return Promise.resolve({ scrolled: false });
+  }
+}
+
 // Listen for highlight requests
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'highlightElements') {
@@ -286,6 +326,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
     } catch (error) {
       sendResponse({ success: false, error: error.toString() });
+    }
+    return true;
+  }
+  
+  if (request.action === 'scrollToElement') {
+    try {
+      const element = document.querySelector(request.selector);
+      if (element) {
+        scrollToElement(element).then(result => {
+          sendResponse({ success: true, ...result });
+        });
+      } else {
+        sendResponse({ success: false, error: 'Element not found' });
+      }
+    } catch (error) {
+      sendResponse({ success: false, error: error.toString() });
+    }
+    return true;
+  }
+  
+  if (request.action === 'getPageDimensions') {
+    try {
+      sendResponse({
+        width: window.innerWidth,
+        height: document.documentElement.scrollHeight,
+        scrollHeight: document.body.scrollHeight
+      });
+    } catch (error) {
+      sendResponse({ error: error.toString() });
     }
     return true;
   }

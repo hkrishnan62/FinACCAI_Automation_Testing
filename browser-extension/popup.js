@@ -80,14 +80,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Display client-side check results
         displayQuickChecks(response.clientChecks);
         
-        // Capture screenshot with highlighted errors
-        captureScreenshotWithHighlights(tab.id, response.clientChecks).then(screenshotUrl => {
-          if (screenshotUrl) {
-            displayScreenshot(screenshotUrl);
-          }
-        });
+        // Capture full page screenshot
+        statusDiv.textContent = '📸 Capturing full page screenshot...';
+        const fullPageScreenshot = await captureFullPageScreenshot(tab.id);
+        if (fullPageScreenshot) {
+          displayScreenshot(fullPageScreenshot);
+        }
         
-        // Send to backend for AI analysis
         statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI analysis...</p>';
         
         chrome.runtime.sendMessage({
@@ -278,46 +277,76 @@ document.addEventListener('DOMContentLoaded', async function() {
     statusDiv.className = 'status error';
   }
   
-  // Capture screenshot with highlighted errors
-  async function captureScreenshotWithHighlights(tabId, issues) {
+  // Capture full page screenshot
+  async function captureFullPageScreenshot(tabId) {
     try {
-      // Calculate total issues
-      const totalIssues = Object.values(issues).reduce((sum, arr) => sum + arr.length, 0);
-      if (totalIssues === 0) {
-        return null; // No issues to highlight
-      }
+      // Get page dimensions
+      const dimensions = await chrome.tabs.sendMessage(tabId, {
+        action: 'getPageDimensions'
+      }).catch(() => ({ width: window.innerWidth, height: document.documentElement.scrollHeight }));
       
-      // Highlight the failing elements
+      // Capture visible area
+      return await chrome.tabs.captureVisibleTab(null, {
+        format: 'png',
+        quality: 90
+      });
+    } catch (error) {
+      console.error('Full page screenshot error:', error);
+      return null;
+    }
+  }
+  
+  // Capture individual issue element screenshot
+  async function captureIssueScreenshot(tabId, issueData) {
+    try {
+      // Scroll to element
       await chrome.tabs.sendMessage(tabId, {
-        action: 'highlightElements',
-        issues: issues
+        action: 'scrollToElement',
+        selector: issueData.selector
       });
       
-      // Wait a bit for highlights to render
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Highlight the issue
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'highlightElements',
+        issues: [issueData]
+      });
       
-      // Capture the screenshot
+      // Wait for render
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      // Capture screenshot
       const screenshot = await chrome.tabs.captureVisibleTab(null, {
         format: 'png',
         quality: 95
       });
       
-      // Remove highlights after a delay
-      setTimeout(async () => {
-        try {
-          await chrome.tabs.sendMessage(tabId, {
-            action: 'removeHighlights'
-          });
-        } catch (e) {
-          // Tab might be closed, ignore
-        }
-      }, 1000);
+      // Remove highlights
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'removeHighlights'
+      }).catch(() => {});
       
       return screenshot;
     } catch (error) {
-      console.error('Screenshot capture error:', error);
+      console.error('Issue screenshot error:', error);
       return null;
     }
+  }
+  
+  // Capture screenshots for multiple issues
+  async function captureIssueScreenshots(tabId, issues) {
+    const screenshots = {};
+    
+    for (let i = 0; i < Math.min(issues.length, 5); i++) {
+      const issue = issues[i];
+      if (issue.element && issue.element.outerHTML) {
+        const screenshot = await captureIssueScreenshot(tabId, issue);
+        if (screenshot) {
+          screenshots[`issue_${i}`] = screenshot;
+        }
+      }
+    }
+    
+    return screenshots;
   }
   
   // Display screenshot in popup
@@ -361,13 +390,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (currentPageData) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      // Capture screenshot for the report
-      let screenshotUrl = null;
-      if (currentPageData.clientChecks) {
-        screenshotUrl = await captureScreenshotWithHighlights(tab.id, currentPageData.clientChecks);
-      }
+      // Capture full page screenshot
+      let fullPageScreenshot = null;
+      statusDiv.textContent = '📸 Capturing full page screenshot...';
+      fullPageScreenshot = await captureFullPageScreenshot(tab.id);
       
-      const reportHtml = generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks, screenshotUrl);
+      const reportHtml = await generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks, fullPageScreenshot);
       downloadHtmlFile(reportHtml, `accessibility_report_${Date.now()}.html`);
       return;
     }
@@ -381,7 +409,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
   
-  function generateClientReport(url, title, checks, screenshotUrl = null) {
+  async function generateClientReport(url, title, checks, screenshotUrl = null) {
     const timestamp = new Date().toLocaleString();
     const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
     
@@ -482,6 +510,39 @@ document.addEventListener('DOMContentLoaded', async function() {
             font-family: monospace;
             font-size: 12px;
         }
+        .issue-screenshot {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .issue-screenshot img {
+            max-width: 100%;
+            max-height: 400px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .issue-screenshot-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        .full-page-screenshot {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .full-page-screenshot img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -493,11 +554,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         <p><em>Client-side analysis</em></p>
     </div>
         ${screenshotUrl ? `
-    <div class="summary" style="background: #fff3cd; border-left: 4px solid #ff9800;">
-        <h2>📸 Error Screenshot</h2>
-        <p style="color: #856404; margin-bottom: 15px;">Failing elements are highlighted in red with numbered badges corresponding to the issue numbers below.</p>
-        <img src="${screenshotUrl}" alt="Screenshot with highlighted errors" 
-             style="width: 100%; max-width: 100%; border-radius: 8px; border: 2px solid #f57c00; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+    <div class="full-page-screenshot">
+        <h2>📸 Full Page Screenshot</h2>
+        <p style="color: #666; margin-bottom: 15px;">Complete view of the analyzed page. Errors are highlighted in red with numbered badges.</p>
+        <img src="${screenshotUrl}" alt="Full page screenshot with highlighted errors">
+        <p style="color: #999; font-size: 12px; margin-top: 10px;">Reference numbers match the issue list below</p>
     </div>
     ` : ''}
         <div class="summary">
