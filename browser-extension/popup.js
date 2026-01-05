@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           if (backendResponse && backendResponse.success) {
             currentReport = backendResponse.data;
             displayAIStatus(backendResponse.data);
-            statusDiv.innerHTML = '<p>✓ Analysis complete!</p>';
+            statusDiv.innerHTML = '<p>✓ Full scan complete!</p>';
             statusDiv.className = 'status success';
             resultsDiv.classList.remove('hidden');
             viewFullReportBtn.classList.remove('hidden');
@@ -123,22 +123,110 @@ document.addEventListener('DOMContentLoaded', async function() {
     </div>`;
     
     const categories = [
-      { key: 'images', label: 'Missing Alt Text' },
-      { key: 'inputs', label: 'Unlabeled Inputs' },
-      { key: 'headings', label: 'Heading Hierarchy' },
-      { key: 'links', label: 'Link Issues' },
-      { key: 'aria', label: 'ARIA Issues' }
+      { key: 'images', label: 'Missing Alt Text', icon: '🖼️' },
+      { key: 'inputs', label: 'Unlabeled Inputs', icon: '📝' },
+      { key: 'headings', label: 'Heading Hierarchy', icon: '📑' },
+      { key: 'links', label: 'Link Issues', icon: '🔗' },
+      { key: 'aria', label: 'ARIA Issues', icon: '♿' }
     ];
     
     categories.forEach(cat => {
       const count = checks[cat.key].length;
-      html += `<div class="issue-count">
-        <span class="issue-label">${cat.label}:</span>
-        <span class="issue-number ${count === 0 ? 'success' : ''}">${count}</span>
-      </div>`;
+      const categoryId = `category-${cat.key}`;
+      
+      html += `
+        <div class="issue-category">
+          <div class="issue-count clickable" onclick="toggleDetails('${categoryId}')">
+            <span class="issue-label">
+              ${cat.icon} ${cat.label}:
+              <span class="toggle-icon" id="toggle-${categoryId}">▶</span>
+            </span>
+            <span class="issue-number ${count === 0 ? 'success' : ''}">${count}</span>
+          </div>
+          <div class="issue-details" id="${categoryId}" style="display: none;">
+            ${formatIssueDetails(cat.key, checks[cat.key])}
+          </div>
+        </div>`;
     });
     
     quickChecksDiv.innerHTML = html;
+    
+    // Add global toggle function
+    window.toggleDetails = function(id) {
+      const details = document.getElementById(id);
+      const toggle = document.getElementById('toggle-' + id);
+      if (details.style.display === 'none') {
+        details.style.display = 'block';
+        toggle.textContent = '▼';
+      } else {
+        details.style.display = 'none';
+        toggle.textContent = '▶';
+      }
+    };
+  }
+  
+  function formatIssueDetails(category, issues) {
+    if (issues.length === 0) {
+      return '<p class="no-issues">✓ No issues found</p>';
+    }
+    
+    let html = '<ul class="issue-list">';
+    
+    issues.forEach((issue, index) => {
+      switch(category) {
+        case 'images':
+          html += `<li class="issue-item">
+            <strong>Image ${index + 1}:</strong><br>
+            <span class="issue-detail">Source: ${issue.src || 'N/A'}</span><br>
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+          
+        case 'inputs':
+          html += `<li class="issue-item">
+            <strong>Input ${index + 1}:</strong> ${issue.type || 'text'}<br>
+            ${issue.id ? `<span class="issue-detail">ID: ${issue.id}</span><br>` : ''}
+            ${issue.name ? `<span class="issue-detail">Name: ${issue.name}</span><br>` : ''}
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+          
+        case 'headings':
+          html += `<li class="issue-item">
+            <strong>Heading ${index + 1}:</strong><br>
+            <span class="issue-detail">${issue.message}</span><br>
+            <span class="issue-detail">Text: "${issue.text}"</span>
+          </li>`;
+          break;
+          
+        case 'links':
+          html += `<li class="issue-item">
+            <strong>Link ${index + 1}:</strong><br>
+            <span class="issue-detail">${issue.message}</span><br>
+            ${issue.text ? `<span class="issue-detail">Text: "${issue.text}"</span><br>` : ''}
+            ${issue.href ? `<span class="issue-detail">URL: ${issue.href}</span><br>` : ''}
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+          
+        case 'aria':
+          html += `<li class="issue-item">
+            <strong>ARIA ${index + 1}:</strong> role="${issue.role}"<br>
+            <span class="issue-detail">${issue.message}</span><br>
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+      }
+    });
+    
+    html += '</ul>';
+    return html;
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
   
   function displayAIStatus(data) {
