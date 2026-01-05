@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinACCAI Extension Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 { color: #667eea; }
+    .good { background: #d4edda; padding: 10px; margin: 10px 0; border-left: 4px solid #28a745; }
+    .bad { background: #f8d7da; padding: 10px; margin: 10px 0; border-left: 4px solid #dc3545; }
+    .code { background: #f4f4f4; padding: 10px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>FinACCAI Extension Test Page</h1>
+  <p>This page contains intentional accessibility issues for testing the extension.</p>
+
+  <h2>Test Section 1: Images</h2>
+  
+  <div class="good">
+    <h3>✓ Good Example</h3>
+    <img src="https://via.placeholder.com/150" alt="A placeholder image with proper alt text">
+    <p>This image has proper alt text.</p>
+  </div>
+
+  <div class="bad">
+    <h3>✗ Bad Example</h3>
+    <img src="https://via.placeholder.com/150" alt="">
+    <img src="https://via.placeholder.com/150">
+    <p>These images have empty or missing alt text - should be flagged!</p>
+  </div>
+
+  <h2>Test Section 2: Form Inputs</h2>
+
+  <div class="good">
+    <h3>✓ Good Example</h3>
+    <form>
+      <label for="goodInput">Name:</label>
+      <input type="text" id="goodInput" name="name">
+    </form>
+    <p>This input has a proper label.</p>
+  </div>
+
+  <div class="bad">
+    <h3>✗ Bad Example</h3>
+    <form>
+      <input type="text" name="badInput" placeholder="No label here">
+      <input type="email" placeholder="Another unlabeled field">
+    </form>
+    <p>These inputs have no labels - should be flagged!</p>
+  </div>
+
+  <h4>Test Section 3: Heading Hierarchy</h4>
+
+  <div class="bad">
+    <h6>✗ Bad Example - Skipped from h4 to h6</h6>
+    <p>This creates a broken heading hierarchy - should be flagged!</p>
+  </div>
+
+  <h2>Test Section 4: Links</h2>
+
+  <div class="good">
+    <h3>✓ Good Example</h3>
+    <a href="https://example.com">Visit our comprehensive accessibility guide</a>
+    <p>This link has descriptive text.</p>
+  </div>
+
+  <div class="bad">
+    <h3>✗ Bad Examples</h3>
+    <a href="https://example.com">click here</a>
+    <a href="https://example.com">more</a>
+    <a href="https://example.com"></a>
+    <p>These links have non-descriptive or missing text - should be flagged!</p>
+  </div>
+
+  <h2>Test Section 5: Color Contrast</h2>
+
+  <div class="bad">
+    <h3>✗ Bad Example</h3>
+    <p style="color: #cccccc; background: #ffffff;">
+      This text has poor contrast (should be flagged if using inline styles)
+    </p>
+  </div>
+
+  <h2>How to Test</h2>
+  <ol>
+    <li>Make sure the FinACCAI extension is installed</li>
+    <li>Click the extension icon in your browser toolbar</li>
+    <li>Click "Analyze Page"</li>
+    <li>Review the results - you should see multiple issues detected</li>
+  </ol>
+
+  <div class="code">
+    <strong>Expected Issues:</strong><br>
+    - Missing Alt Text: 2 images<br>
+    - Unlabeled Inputs: 2 form fields<br>
+    - Heading Hierarchy: 1 issue (h4→h6 skip)<br>
+    - Link Issues: 3 links<br>
+  </div>
+
+  <h2>Testing the Backend</h2>
+  <p>If you have the API server running (<code>python browser-extension/api_server.py</code>), 
+     you'll also get AI-powered analysis and can download a full HTML report.</p>
+
+  <div role="button">
+    <p>This has a button role but no accessible name - should be flagged!</p>
+  </div>
+
+  <footer>
+    <p>FinACCAI Browser Extension Test Page | &copy; 2026</p>
+  </footer>
+</body>
+</html>

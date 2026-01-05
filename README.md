@@ -2,6 +2,8 @@
 
 FinAccAI is a Python-based accessibility testing prototype that performs automated, rule-based testing on websites to identify common WCAG-aligned accessibility issues. The tool is useful for QA engineers, accessibility auditors, and development teams who want a fast, lightweight assessment of baseline accessibility across one or more web applications.
 
+**NEW**: Now available as a browser extension! Test any webpage in real-time with a single click. See the [Browser Extension](#browser-extension) section below.
+
 [![Accessibility scan](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml/badge.svg)](https://github.com/hkrishnan62/Accessibility-2025/actions/workflows/scan.yml)
 
 ---
@@ -10,7 +12,8 @@ FinAccAI is a Python-based accessibility testing prototype that performs automat
 
 ## Key Capabilities ✅
 
-
+- **🆕 Browser Extension** — Real-time accessibility testing as you browse
+- **Batch URL Scanning** — Process multiple websites from CSV files
 - **Model-driven analysis (optional)** — integrates ML/NLP/vision modules to supplement rule-based checks (image captioning, NLP context checks, and explainability outputs)
 
 ---
@@ -99,6 +102,47 @@ Output: a timestamped HTML report saved under `log/`, e.g. `log/accessibility_re
 - `tests/` — test suite (includes a smoke test to ensure pytest finds at least one test)
 - `models/` — large model artifacts (tracked with Git LFS)
 - `log/` — generated HTML reports
+- `browser-extension/` — browser extension for real-time testing
+
+---
+
+## Browser Extension
+
+FinACCAI is now available as a browser extension for Chrome and Edge! Test any webpage in real-time without leaving your browser.
+
+### Quick Setup
+
+1. **Install dependencies:**
+   ```bash
+   ./setup_extension.sh
+   ```
+
+2. **Load the extension:**
+   - Open Chrome/Edge and navigate to `chrome://extensions/` (or `edge://extensions/`)
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select the `browser-extension` folder
+
+3. **Start the API server (optional but recommended):**
+   ```bash
+   python browser-extension/api_server.py
+   ```
+
+4. **Use the extension:**
+   - Navigate to any webpage
+   - Click the FinACCAI extension icon
+   - Click "Analyze Page"
+   - View instant results and detailed reports
+
+### Extension Features
+
+- ✅ **Instant Client-Side Checks**: Fast accessibility checks without backend
+- ✅ **AI-Powered Analysis**: Optional ML/NLP analysis when backend is running
+- ✅ **Visual Reports**: Beautiful, detailed HTML reports
+- ✅ **Export Options**: Download reports for sharing
+- ✅ **Zero Configuration**: Works immediately for basic checks
+
+For detailed extension documentation, see [browser-extension/README.md](browser-extension/README.md).
 
 ---
 

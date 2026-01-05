@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinACCAI Checker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>FinACCAI</h1>
+      <p class="subtitle">Accessibility Checker</p>
+    </div>
+    
+    <div class="content">
+      <div id="status" class="status">
+        <p>Click "Analyze Page" to check accessibility</p>
+      </div>
+      
+      <button id="analyzeBtn" class="analyze-btn">Analyze Page</button>
+      
+      <div id="results" class="results hidden">
+        <div class="section">
+          <h3>Quick Checks</h3>
+          <div id="quickChecks"></div>
+        </div>
+        
+        <div class="section">
+          <h3>AI Analysis Status</h3>
+          <div id="aiStatus"></div>
+        </div>
+        
+        <div class="actions">
+          <button id="viewFullReport" class="btn-secondary hidden">View Full Report</button>
+          <button id="downloadReport" class="btn-secondary hidden">Download Report</button>
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p><small>Powered by FinACCAI ML & Vision Models</small></p>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
