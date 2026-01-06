@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         let screenshotData = null;
         try {
           const screenshotBase64 = await captureFullPageScreenshot(tab.id);
+          console.log('[FinACCAI] Screenshot captured, length:', screenshotBase64 ? screenshotBase64.length : 0);
           if (screenshotBase64) {
             // Store screenshot for later use
             currentScreenshot = screenshotBase64;
@@ -148,10 +149,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Try direct API call first (faster, works from extension context)
         const apiUrl = await testAPIConnection();
+        console.log('[FinACCAI] API URL detected:', apiUrl);
+        
         // Get selected WCAG level from dropdown
         const selectedLevel = document.getElementById('levelSelect') ? document.getElementById('levelSelect').value : 'AAA';
+        console.log('[FinACCAI] Selected WCAG level:', selectedLevel);
         
         if (apiUrl) {
+          console.log('[FinACCAI] Attempting direct API call to:', apiUrl);
           try {
             const backendResponse = await fetch(apiUrl, {
               method: 'POST',
@@ -169,9 +174,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             if (backendResponse.ok) {
               const responseData = await backendResponse.json();
+              console.log('[FinACCAI] Backend response received:', responseData);
               analyzeBtn.disabled = false;
               // Server returns {success: true, data: {...}}
               currentReport = responseData.data || responseData;
+              console.log('[FinACCAI] Current report set:', currentReport);
               displayAIStatus(currentReport);
               statusDiv.innerHTML = '<p>✓ Full scan complete!</p>';
               statusDiv.className = 'status success';
@@ -181,8 +188,11 @@ document.addEventListener('DOMContentLoaded', async function() {
               return;
             }
           } catch (e) {
+            console.error('[FinACCAI] Direct API call failed:', e);
             console.warn('Direct API call failed, trying service worker:', e);
           }
+        } else {
+          console.warn('[FinACCAI] No API URL found, backend not available');
         }
         
         // Fallback: Use service worker
