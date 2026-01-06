@@ -168,10 +168,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             
             if (backendResponse.ok) {
-              const data = await backendResponse.json();
+              const responseData = await backendResponse.json();
               analyzeBtn.disabled = false;
-              currentReport = data;
-              displayAIStatus(data);
+              // Server returns {success: true, data: {...}}
+              currentReport = responseData.data || responseData;
+              displayAIStatus(currentReport);
               statusDiv.innerHTML = '<p>✓ Full scan complete!</p>';
               statusDiv.className = 'status success';
               resultsDiv.classList.remove('hidden');
@@ -375,25 +376,76 @@ document.addEventListener('DOMContentLoaded', async function() {
     statusDiv.className = 'status error';
   }
   
-  // Capture full page screenshot
+  // Capture full page screenshot by stitching multiple viewport captures
   async function captureFullPageScreenshot(tabId) {
     try {
-      // First, scroll to top of page to ensure consistent capture
+      // Get page dimensions
+      const dimensions = await chrome.tabs.sendMessage(tabId, {
+        action: 'getPageDimensions'
+      });
+      
+      if (!dimensions) {
+        throw new Error('Could not get page dimensions');
+      }
+      
+      const pageHeight = dimensions.scrollHeight || dimensions.height;
+      const viewportHeight = dimensions.height || window.innerHeight;
+      
+      // If page is smaller than viewport, just capture once
+      if (pageHeight <= viewportHeight * 1.5) {
+        // Scroll to top
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'executeScript',
+          script: 'window.scrollTo(0, 0);'
+        }).catch(() => {});
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const screenshot = await chrome.tabs.captureVisibleTab(null, {
+          format: 'png',
+          quality: 100
+        });
+        
+        return screenshot;
+      }
+      
+      // For longer pages, capture multiple viewports and return the first comprehensive one
+      // This is a simplified approach - full stitching would require canvas manipulation
+      const screenshots = [];
+      const numCaptures = Math.min(3, Math.ceil(pageHeight / viewportHeight)); // Limit to 3 captures
+      
+      for (let i = 0; i < numCaptures; i++) {
+        const scrollY = i * viewportHeight;
+        
+        // Scroll to position
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'executeScript',
+          script: `window.scrollTo(0, ${scrollY});`
+        }).catch(() => {});
+        
+        // Wait for rendering
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        // Capture this viewport
+        const screenshot = await chrome.tabs.captureVisibleTab(null, {
+          format: 'png',
+          quality: 95
+        });
+        
+        screenshots.push(screenshot);
+      }
+      
+      // Scroll back to top
       await chrome.tabs.sendMessage(tabId, {
         action: 'executeScript',
         script: 'window.scrollTo(0, 0);'
       }).catch(() => {});
       
-      // Wait for scroll to complete and page to render
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // For now, return the first screenshot (top of page with highlights)
+      // In a future enhancement, these could be stitched together
+      // or sent to backend for server-side stitching
+      return screenshots[0];
       
-      // Capture the visible viewport (which now shows the top of the page with highlights)
-      const screenshot = await chrome.tabs.captureVisibleTab(null, {
-        format: 'png',
-        quality: 100
-      });
-      
-      return screenshot;
     } catch (error) {
       console.error('Full page screenshot error:', error);
       // Try a simple capture without scrolling
@@ -511,7 +563,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         fullPageScreenshot = await captureFullPageScreenshot(tab.id);
       }
       
-      const reportHtml = await generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks, fullPageScreenshot);
+      // Get selected WCAG level
+      const selectedLevel = document.getElementById('levelSelect') ? document.getElementById('levelSelect').value : 'AAA';
+      
+      // Pass both client checks and backend report data (if available)
+      const reportHtml = await generateClientReport(
+        currentPageData.url, 
+        currentPageData.title, 
+        currentPageData.clientChecks, 
+        fullPageScreenshot,
+        currentReport,  // Pass backend data if available
+        selectedLevel
+      );
       downloadHtmlFile(reportHtml, `accessibility_report_${Date.now()}.html`);
       return;
     }
@@ -525,9 +588,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
   
-  async function generateClientReport(url, title, checks, screenshotUrl = null) {
+  async function generateClientReport(url, title, checks, screenshotUrl = null, backendData = null, level = 'AAA') {
     const timestamp = new Date().toLocaleString();
     const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
+    
+    // Determine analysis mode
+    let analysisMode = `WCAG 2.1 Level ${level} - Client-side analysis`;
+    if (backendData && backendData.ai_ml_enabled) {
+      analysisMode = `WCAG 2.1 Level ${level} with AI/ML Enhancement`;
+    }
     
     let html = `<!DOCTYPE html>
 <html lang="en">
@@ -659,6 +728,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             height: auto;
             border-radius: 4px;
         }
+        .ai-section {
+            border-left: 4px solid #667eea !important;
+        }
+        .ai-success {
+            background: #d4edda !important;
+            border-left: 4px solid #28a745 !important;
+        }
+        .ai-warning {
+            background: #fff3cd !important;
+            border-left: 4px solid #ffc107 !important;
+        }
     </style>
 </head>
 <body>
@@ -667,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         <p><strong>Page:</strong> ${escapeHtml(title)}</p>
         <p><strong>URL:</strong> ${escapeHtml(url)}</p>
         <p><strong>Generated:</strong> ${timestamp}</p>
-        <p><em>Client-side analysis</em></p>
+        <p><strong>Analysis Mode:</strong> ${analysisMode}</p>
     </div>
         ${screenshotUrl ? `
     <div class="full-page-screenshot">
@@ -756,6 +836,121 @@ document.addEventListener('DOMContentLoaded', async function() {
             <div class="code">${escapeHtml(issue.snippet)}</div>
         </div>
     `, '✓ No issues found - ARIA attributes are correct');
+    
+    // AI/ML Analysis section (if backend data is available)
+    if (backendData && backendData.ai_ml_results) {
+      const aiResults = backendData.ai_ml_results;
+      
+      html += '<div class="category ai-section"><h2>🤖 AI/ML Analysis Results</h2>';
+      
+      if (backendData.ai_ml_enabled && aiResults.status === 'AI/ML analysis completed') {
+        html += '<div class="issue ai-success"><div class="issue-title" style="color: #155724;">✓ AI/ML Analysis Completed</div>';
+        html += '<div class="issue-detail" style="color: #155724;">Advanced analysis using machine learning and natural language processing</div></div>';
+        
+        // NLP Analysis
+        const nlp = aiResults.nlp_analysis || [];
+        if (nlp && nlp.length > 0) {
+          html += `<div class="issue"><div class="issue-title">📝 NLP Analysis (${nlp.length} findings)</div>`;
+          nlp.forEach(finding => {
+            html += `<div class="issue-detail">• ${escapeHtml(finding)}</div>`;
+          });
+          html += '</div>';
+        }
+        
+        // ML Predictions
+        const mlPred = aiResults.ml_predictions || {};
+        if (mlPred && typeof mlPred === 'object') {
+          // Summary
+          const summary = mlPred.summary || {};
+          if (summary.title) {
+            html += `<div class="issue" style="border-left: 4px solid #17a2b8; background: #d1ecf1;">`;
+            html += `<div class="issue-title" style="color: #0c5460;">${escapeHtml(summary.title)}</div>`;
+            html += `<div class="issue-detail" style="color: #0c5460;">${escapeHtml(summary.description || '')}</div>`;
+            html += '</div>';
+          }
+          
+          // Overall severity
+          if (mlPred.severity || mlPred.explanation) {
+            html += '<div class="issue"><div class="issue-title">📊 Overall Assessment</div>';
+            if (mlPred.severity) html += `<div class="issue-detail"><strong>${escapeHtml(mlPred.severity)}</strong></div>`;
+            if (mlPred.explanation) html += `<div class="issue-detail">${escapeHtml(mlPred.explanation)}</div>`;
+            html += '</div>';
+          }
+          
+          // Insights
+          const insights = mlPred.insights || [];
+          insights.forEach(insight => {
+            const severityColors = {
+              'High': '#dc3545',
+              'Medium': '#ffc107',
+              'Low': '#17a2b8',
+              'Good': '#28a745'
+            };
+            const color = severityColors[insight.severity] || '#6c757d';
+            
+            html += `<div class="issue" style="border-left: 4px solid ${color};">`;
+            html += `<div class="issue-title">${escapeHtml(insight.title || 'Insight')}</div>`;
+            if (insight.explanation) html += `<div class="issue-detail"><strong>What we found:</strong> ${escapeHtml(insight.explanation)}</div>`;
+            if (insight.impact) html += `<div class="issue-detail"><strong>Why it matters:</strong> ${escapeHtml(insight.impact)}</div>`;
+            if (insight.what_to_do) html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(insight.what_to_do)}</div>`;
+            html += `<div class="issue-detail" style="margin-top: 5px; font-size: 12px; color: #666;">`;
+            html += `Confidence: ${escapeHtml(insight.confidence || 'Unknown')} | Severity: ${escapeHtml(insight.severity || 'Unknown')}`;
+            html += '</div></div>';
+          });
+          
+          // Statistics
+          const stats = mlPred.statistics || {};
+          if (stats.title) {
+            html += `<div class="issue" style="border-left: 4px solid #6c757d; background: #f8f9fa;">`;
+            html += `<div class="issue-title">${escapeHtml(stats.title)}</div>`;
+            (stats.items || []).forEach(item => {
+              html += `<div class="issue-detail">• ${escapeHtml(item)}</div>`;
+            });
+            html += '</div>';
+          }
+          
+          // Model info
+          if (mlPred.model_info) {
+            html += `<div class="issue-detail" style="text-align: center; color: #6c757d; margin-top: 10px;">${escapeHtml(mlPred.model_info)}</div>`;
+          }
+        }
+        
+        // XAI Explanations
+        const xai = aiResults.xai_explanations || {};
+        if (xai && typeof xai === 'object') {
+          const recommendations = xai.recommendations || [];
+          if (recommendations.length > 0) {
+            html += `<div class="issue"><div class="issue-title">💡 Explainable AI Recommendations (${recommendations.length} suggestions)</div>`;
+            recommendations.forEach((rec, i) => {
+              if (typeof rec === 'object') {
+                const title = rec.recommendation || '';
+                const category = rec.category || 'General';
+                if (title) {
+                  html += `<div class="issue-detail" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">`;
+                  html += `<strong>${i + 1}. ${escapeHtml(title)}</strong> <span style="color: #666; font-size: 12px;">(${escapeHtml(category)})</span>`;
+                  html += '</div>';
+                }
+              } else {
+                html += `<div class="issue-detail">• ${escapeHtml(rec)}</div>`;
+              }
+            });
+            html += '</div>';
+          }
+        }
+        
+      } else {
+        // AI/ML not available
+        html += '<div class="issue ai-warning"><div class="issue-title" style="color: #856404;">⚠ AI/ML Not Available</div>';
+        html += `<div class="issue-detail" style="color: #856404;">${escapeHtml(aiResults.status || 'AI/ML modules not installed')}</div>`;
+        html += '<div class="issue-detail" style="color: #856404; margin-top: 10px;">';
+        html += '<strong>To enable AI/ML features:</strong><br>';
+        html += '<code style="background: #2d2d2d; color: #f8f8f2; padding: 5px; display: block; margin-top: 5px;">';
+        html += 'pip install transformers torch scikit-learn pillow';
+        html += '</code></div></div>';
+      }
+      
+      html += '</div>';
+    }
     
     html += '</body></html>';
     return html;

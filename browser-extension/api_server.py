@@ -30,8 +30,8 @@ except ImportError as e:
 app = Flask(__name__)
 CORS(app)  # Enable CORS for browser extension
 
-# Directory to store generated reports
-REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'reports')
+# Directory to store generated reports - use the root reports directory
+REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 
