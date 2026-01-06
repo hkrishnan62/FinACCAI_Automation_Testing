@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinACCAI AI Analysis Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; }
+        .issue { color: #dc3545; font-weight: bold; }
+        .good { color: #28a745; font-weight: bold; }
+        img { max-width: 100%; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>FinACCAI AI Analysis Test Page</h1>
+    <p>This page contains accessibility issues for testing the AI/ML analysis features.</p>
+
+    <div class="test-section">
+        <h2>Image Issues (Missing Alt Text)</h2>
+        <p class="issue">❌ These images have no alt text:</p>
+        <img src="https://via.placeholder.com/200" />
+        <img src="https://via.placeholder.com/200" />
+        <p class="good">✓ This image has alt text:</p>
+        <img src="https://via.placeholder.com/200" alt="Placeholder image" />
+    </div>
+
+    <div class="test-section">
+        <h2>Form Issues (Unlabeled Inputs)</h2>
+        <p class="issue">❌ These inputs have no labels:</p>
+        <input type="text" placeholder="Username" />
+        <input type="email" placeholder="Email" />
+        <p class="good">✓ This input has a label:</p>
+        <label for="password">Password: </label>
+        <input id="password" type="password" />
+    </div>
+
+    <div class="test-section">
+        <h2>Heading Hierarchy</h2>
+        <h1>Main Title</h1>
+        <p class="issue">❌ Heading hierarchy broken - should have h2 here:</p>
+        <h3>Subsection</h3>
+        <p class="good">✓ Proper hierarchy:</p>
+        <h2>Section 1</h2>
+        <h3>Subsection 1.1</h3>
+    </div>
+
+    <div class="test-section">
+        <h2>Link Text Issues</h2>
+        <p class="issue">❌ Generic link text:</p>
+        <a href="#test">Click here</a>
+        <a href="#test">Read more</a>
+        <p class="good">✓ Descriptive link text:</p>
+        <a href="#test">View accessibility guidelines</a>
+        <a href="#test">Learn more about WCAG standards</a>
+    </div>
+
+    <div class="test-section">
+        <h2>ARIA Issues</h2>
+        <p class="issue">❌ Using ARIA when native HTML exists:</p>
+        <div role="button">Click me</div>
+        <p class="good">✓ Using native HTML:</p>
+        <button>Click me</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Open this page in Chrome/Edge/Brave</li>
+            <li>Click the FinACCAI extension icon in the toolbar</li>
+            <li>Select WCAG Level (AA recommended)</li>
+            <li>Click "Analyze Page"</li>
+            <li>You should see AI/ML analysis results with compliance score and detailed XAI explanations</li>
+            <li>Click "Download Report" to see the full report with all AI/ML details</li>
+        </ol>
+    </div>
+</body>
+</html>

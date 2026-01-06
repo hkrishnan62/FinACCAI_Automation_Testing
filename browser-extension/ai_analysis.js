@@ -350,11 +350,7 @@ class FinACCAIAIAnalysis {
           why: 'Screen reader users navigate pages using heading hierarchies (h1 → h2 → h3). When hierarchy is broken (h1 → h3, skipping h2), it confuses navigation. Users cannot understand page structure.',
           impact_users: 'Blind users, low-vision users, users with cognitive disabilities',
           fix: 'Use <h1>, <h2>, <h3> in order without skipping levels. One H1 per page. Start with H1, then H2, then H3, etc.',
-          example: `<h1>Page Title</h1>
-<h2>Section 1</h2>
-<h3>Subsection 1.1</h3>
-<h3>Subsection 1.2</h3>
-<h2>Section 2</h2>`,
+          example: '<h1>Page Title</h1>\n<h2>Section 1</h2>\n<h3>Subsection 1.1</h3>\n<h3>Subsection 1.2</h3>\n<h2>Section 2</h2>',
           wcag: 'WCAG 2.1 1.3.1 (Level A)',
           severity: 'HIGH',
           count: checks.headings.length
@@ -364,14 +360,10 @@ class FinACCAIAIAnalysis {
       if (checks.links && checks.links.length > 0) {
         explanations.important_fixes.push({
           issue: 'Link Accessibility Issues',
-          why: 'Links with generic text like "click here", "read more", or "link" don't tell users what they will get. Screen reader users often navigate by links only. Descriptive link text is essential.',
+          why: "Links with generic text like \"click here\", \"read more\", or \"link\" don't tell users what they will get. Screen reader users often navigate by links only. Descriptive link text is essential.",
           impact_users: 'Blind users, low-vision users, users with cognitive disabilities, keyboard-only users',
           fix: 'Use descriptive link text that makes sense out of context: "Read our accessibility guidelines" instead of "click here"',
-          example: `<!-- Bad -->
-<a href="/docs">Click here</a>
-
-<!-- Good -->
-<a href="/docs">Read our accessibility guidelines</a>`,
+          example: '<!-- Bad -->\n<a href="/docs">Click here</a>\n\n<!-- Good -->\n<a href="/docs">Read our accessibility guidelines</a>',
           wcag: 'WCAG 2.1 2.4.4 (Level A)',
           severity: 'MEDIUM',
           count: checks.links.length
@@ -383,12 +375,8 @@ class FinACCAIAIAnalysis {
           issue: 'ARIA Attribute Issues',
           why: 'Incorrectly used ARIA attributes provide wrong information to screen readers. ARIA should enhance native HTML, not replace it. Bad ARIA is worse than no ARIA.',
           impact_users: 'Blind users, low-vision users, users with motor disabilities',
-          fix: 'Prefer native HTML elements. Use ARIA only when native HTML doesn\'t exist. Always test with actual screen readers.',
-          example: `<!-- Bad: Using role when button element exists -->
-<div role="button">Click me</div>
-
-<!-- Good: Use native button -->
-<button>Click me</button>`,
+          fix: 'Prefer native HTML elements. Use ARIA only when native HTML does not exist. Always test with actual screen readers.',
+          example: '<!-- Bad: Using role when button element exists -->\n<div role="button">Click me</div>\n\n<!-- Good: Use native button -->\n<button>Click me</button>',
           wcag: 'WCAG 2.1 4.1.2 (Level A)',
           severity: 'MEDIUM',
           count: checks.aria.length
