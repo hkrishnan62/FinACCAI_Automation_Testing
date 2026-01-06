@@ -877,97 +877,179 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += '<div class="issue ai-success"><div class="issue-title" style="color: #155724;">✓ AI/ML Analysis Completed</div>';
         html += '<div class="issue-detail" style="color: #155724;">Advanced analysis using machine learning and natural language processing</div></div>';
         
-        // NLP Analysis
-        const nlp = aiResults.nlp_analysis || [];
-        if (nlp && nlp.length > 0) {
-          html += `<div class="issue"><div class="issue-title">📝 NLP Analysis (${nlp.length} findings)</div>`;
-          nlp.forEach(finding => {
-            html += `<div class="issue-detail">• ${escapeHtml(finding)}</div>`;
+        // ML Predictions - Compliance Score
+        const mlPred = aiResults.ml_predictions || {};
+        if (mlPred.compliance_score !== undefined) {
+          const score = Math.round(mlPred.compliance_score);
+          const color = score >= 80 ? '#28a745' : score >= 60 ? '#ffc107' : '#dc3545';
+          html += `<div class="issue" style="border-left: 4px solid ${color}; background: ${color}20;">`;
+          html += `<div class="issue-title" style="color: ${color};">📊 Accessibility Compliance Score: ${score}%</div>`;
+          html += `</div>`;
+        }
+
+        // Summary
+        if (mlPred.summary && mlPred.summary.title) {
+          const bgColor = mlPred.summary.title.includes('Excellent') || mlPred.summary.title.includes('Good') ? '#d4edda' : 
+                         mlPred.summary.title.includes('Fair') ? '#fff3cd' : '#f8d7da';
+          const borderColor = mlPred.summary.title.includes('Excellent') || mlPred.summary.title.includes('Good') ? '#28a745' : 
+                            mlPred.summary.title.includes('Fair') ? '#ffc107' : '#dc3545';
+          html += `<div class="issue" style="border-left: 4px solid ${borderColor}; background: ${bgColor};">`;
+          html += `<div class="issue-title">${escapeHtml(mlPred.summary.title)}</div>`;
+          html += `<div class="issue-detail">${escapeHtml(mlPred.summary.description || '')}</div>`;
+          html += `</div>`;
+        }
+
+        // Critical Issues
+        if (mlPred.high_risk_issues && mlPred.high_risk_issues.length > 0) {
+          html += '<div class="issue" style="border-left: 4px solid #dc3545; background: #f8d7da;"><div class="issue-title" style="color: #721c24;">🚨 Critical Issues Found</div>';
+          mlPred.high_risk_issues.forEach((issue, i) => {
+            html += `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f5c6cb;">`;
+            html += `<div class="issue-title" style="color: #721c24;">${i + 1}. ${escapeHtml(issue.type.replace(/_/g, ' ')).toUpperCase()}</div>`;
+            html += `<div class="issue-detail"><strong>Count:</strong> ${issue.count} issue${issue.count > 1 ? 's' : ''}</div>`;
+            html += `<div class="issue-detail"><strong>Impact:</strong> ${escapeHtml(issue.impact)}</div>`;
+            if (issue.why_matters) {
+              html += `<div class="issue-detail"><strong>Why it matters:</strong> ${escapeHtml(issue.why_matters)}</div>`;
+            }
+            html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(issue.what_to_do)}</div>`;
+            html += `<div class="issue-detail" style="color: #666; font-size: 12px; margin-top: 5px;">WCAG Standard: ${escapeHtml(issue.wcag_standard)}</div>`;
+            html += `</div>`;
           });
           html += '</div>';
         }
-        
-        // ML Predictions
-        const mlPred = aiResults.ml_predictions || {};
-        if (mlPred && typeof mlPred === 'object') {
-          // Summary
-          const summary = mlPred.summary || {};
-          if (summary.title) {
-            html += `<div class="issue" style="border-left: 4px solid #17a2b8; background: #d1ecf1;">`;
-            html += `<div class="issue-title" style="color: #0c5460;">${escapeHtml(summary.title)}</div>`;
-            html += `<div class="issue-detail" style="color: #0c5460;">${escapeHtml(summary.description || '')}</div>`;
-            html += '</div>';
-          }
-          
-          // Overall severity
-          if (mlPred.severity || mlPred.explanation) {
-            html += '<div class="issue"><div class="issue-title">📊 Overall Assessment</div>';
-            if (mlPred.severity) html += `<div class="issue-detail"><strong>${escapeHtml(mlPred.severity)}</strong></div>`;
-            if (mlPred.explanation) html += `<div class="issue-detail">${escapeHtml(mlPred.explanation)}</div>`;
-            html += '</div>';
-          }
-          
-          // Insights
-          const insights = mlPred.insights || [];
-          insights.forEach(insight => {
-            const severityColors = {
-              'High': '#dc3545',
-              'Medium': '#ffc107',
-              'Low': '#17a2b8',
-              'Good': '#28a745'
-            };
-            const color = severityColors[insight.severity] || '#6c757d';
-            
-            html += `<div class="issue" style="border-left: 4px solid ${color};">`;
-            html += `<div class="issue-title">${escapeHtml(insight.title || 'Insight')}</div>`;
-            if (insight.explanation) html += `<div class="issue-detail"><strong>What we found:</strong> ${escapeHtml(insight.explanation)}</div>`;
-            if (insight.impact) html += `<div class="issue-detail"><strong>Why it matters:</strong> ${escapeHtml(insight.impact)}</div>`;
-            if (insight.what_to_do) html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(insight.what_to_do)}</div>`;
-            html += `<div class="issue-detail" style="margin-top: 5px; font-size: 12px; color: #666;">`;
-            html += `Confidence: ${escapeHtml(insight.confidence || 'Unknown')} | Severity: ${escapeHtml(insight.severity || 'Unknown')}`;
-            html += '</div></div>';
+
+        // Medium Risk Issues
+        if (mlPred.low_risk_issues && mlPred.low_risk_issues.length > 0) {
+          html += '<div class="issue" style="border-left: 4px solid #ffc107; background: #fff3cd;"><div class="issue-title" style="color: #856404;">⚠ Medium Priority Issues</div>';
+          mlPred.low_risk_issues.forEach((issue, i) => {
+            html += `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ffeeba;">`;
+            html += `<div class="issue-title" style="color: #856404;">${i + 1}. ${escapeHtml(issue.type.replace(/_/g, ' ')).toUpperCase()}</div>`;
+            html += `<div class="issue-detail"><strong>Count:</strong> ${issue.count} issue${issue.count > 1 ? 's' : ''}</div>`;
+            html += `<div class="issue-detail"><strong>Impact:</strong> ${escapeHtml(issue.impact)}</div>`;
+            if (issue.why_matters) {
+              html += `<div class="issue-detail"><strong>Why it matters:</strong> ${escapeHtml(issue.why_matters)}</div>`;
+            }
+            html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(issue.what_to_do)}</div>`;
+            html += `<div class="issue-detail" style="color: #666; font-size: 12px; margin-top: 5px;">WCAG Standard: ${escapeHtml(issue.wcag_standard)}</div>`;
+            html += `</div>`;
           });
-          
-          // Statistics
-          const stats = mlPred.statistics || {};
-          if (stats.title) {
-            html += `<div class="issue" style="border-left: 4px solid #6c757d; background: #f8f9fa;">`;
-            html += `<div class="issue-title">${escapeHtml(stats.title)}</div>`;
-            (stats.items || []).forEach(item => {
-              html += `<div class="issue-detail">• ${escapeHtml(item)}</div>`;
+          html += '</div>';
+        }
+
+        // NLP Analysis
+        const nlp = aiResults.nlp_analysis || {};
+        if (nlp && typeof nlp === 'object' && Object.keys(nlp).length > 0) {
+          html += '<div class="issue" style="border-left: 4px solid #17a2b8;"><div class="issue-title">📝 NLP (Natural Language Processing) Analysis</div>';
+          if (nlp.text_quality !== undefined) {
+            html += `<div class="issue-detail"><strong>Text Quality Score:</strong> ${Math.round(nlp.text_quality)}/100</div>`;
+          }
+          if (nlp.label_quality !== undefined) {
+            html += `<div class="issue-detail"><strong>Label Quality Score:</strong> ${Math.round(nlp.label_quality)}/100</div>`;
+          }
+          if (nlp.semantic_structure) {
+            html += `<div class="issue-detail"><strong>Semantic Structure:</strong> ${JSON.stringify(nlp.semantic_structure).replace(/[{}":]/g, ' ').trim()}</div>`;
+          }
+          if (nlp.recommendations && nlp.recommendations.length > 0) {
+            html += `<div class="issue-detail" style="margin-top: 10px;"><strong>Recommendations:</strong></div>`;
+            nlp.recommendations.forEach(rec => {
+              html += `<div class="issue-detail" style="margin-left: 20px;">• ${escapeHtml(rec)}</div>`;
+            });
+          }
+          html += '</div>';
+        }
+
+        // Vision Analysis
+        const vision = aiResults.vision_analysis || {};
+        if (vision && typeof vision === 'object' && vision.images_analyzed) {
+          const altCoverage = Math.round((vision.images_with_alt / vision.images_analyzed) * 100);
+          html += '<div class="issue" style="border-left: 4px solid #17a2b8;"><div class="issue-title">🖼️ Vision Analysis</div>';
+          html += `<div class="issue-detail"><strong>Images Found:</strong> ${vision.images_analyzed}</div>`;
+          html += `<div class="issue-detail"><strong>Images with Alt Text:</strong> ${vision.images_with_alt}/${vision.images_analyzed} (${altCoverage}%)</div>`;
+          if (vision.recommendations && vision.recommendations.length > 0) {
+            html += `<div class="issue-detail" style="margin-top: 10px;"><strong>Recommendations:</strong></div>`;
+            vision.recommendations.forEach(rec => {
+              html += `<div class="issue-detail" style="margin-left: 20px;">• ${escapeHtml(rec)}</div>`;
+            });
+          }
+          html += '</div>';
+        }
+
+        // XAI Explainable AI
+        const xai = aiResults.xai_explanations || {};
+        if (xai && typeof xai === 'object') {
+          // Critical Fixes
+          if (xai.critical_fixes && xai.critical_fixes.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #dc3545;"><div class="issue-title">💡 XAI: Critical Fixes Explained</div>';
+            xai.critical_fixes.forEach((fix, i) => {
+              html += `<div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px;">`;
+              html += `<div class="issue-title" style="color: #721c24;">${i + 1}. ${escapeHtml(fix.issue)}</div>`;
+              html += `<div class="issue-detail"><strong>Why this matters:</strong> ${escapeHtml(fix.why)}</div>`;
+              html += `<div class="issue-detail"><strong>Impact on users:</strong> ${escapeHtml(fix.impact_users)}</div>`;
+              html += `<div class="issue-detail"><strong>Severity:</strong> <span style="color: #dc3545; font-weight: bold;">${escapeHtml(fix.severity)}</span></div>`;
+              html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(fix.fix)}</div>`;
+              html += `<div style="background: #2d2d2d; color: #f8f8f2; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 8px 0;">`;
+              html += escapeHtml(fix.example);
+              html += `</div>`;
+              html += `<div class="issue-detail" style="color: #666; font-size: 12px;">WCAG Standard: ${escapeHtml(fix.wcag)}</div>`;
+              html += `</div>`;
             });
             html += '</div>';
           }
-          
-          // Model info
-          if (mlPred.model_info) {
-            html += `<div class="issue-detail" style="text-align: center; color: #6c757d; margin-top: 10px;">${escapeHtml(mlPred.model_info)}</div>`;
+
+          // Important Fixes
+          if (xai.important_fixes && xai.important_fixes.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #ffc107;"><div class="issue-title">💡 XAI: Important Fixes Explained</div>';
+            xai.important_fixes.forEach((fix, i) => {
+              html += `<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px;">`;
+              html += `<div class="issue-title" style="color: #856404;">${i + 1}. ${escapeHtml(fix.issue)}</div>`;
+              html += `<div class="issue-detail"><strong>Why this matters:</strong> ${escapeHtml(fix.why)}</div>`;
+              html += `<div class="issue-detail"><strong>Impact on users:</strong> ${escapeHtml(fix.impact_users)}</div>`;
+              html += `<div class="issue-detail"><strong>Severity:</strong> <span style="color: #ffc107; font-weight: bold;">${escapeHtml(fix.severity)}</span></div>`;
+              html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(fix.fix)}</div>`;
+              html += `<div style="background: #2d2d2d; color: #f8f8f2; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 8px 0; white-space: pre-wrap;">`;
+              html += escapeHtml(fix.example);
+              html += `</div>`;
+              html += `<div class="issue-detail" style="color: #666; font-size: 12px;">WCAG Standard: ${escapeHtml(fix.wcag)}</div>`;
+              html += `</div>`;
+            });
+            html += '</div>';
           }
-        }
-        
-        // XAI Explanations
-        const xai = aiResults.xai_explanations || {};
-        if (xai && typeof xai === 'object') {
-          const recommendations = xai.recommendations || [];
-          if (recommendations.length > 0) {
-            html += `<div class="issue"><div class="issue-title">💡 Explainable AI Recommendations (${recommendations.length} suggestions)</div>`;
-            recommendations.forEach((rec, i) => {
-              if (typeof rec === 'object') {
-                const title = rec.recommendation || '';
-                const category = rec.category || 'General';
-                if (title) {
-                  html += `<div class="issue-detail" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">`;
-                  html += `<strong>${i + 1}. ${escapeHtml(title)}</strong> <span style="color: #666; font-size: 12px;">(${escapeHtml(category)})</span>`;
-                  html += '</div>';
+
+          // Recommendations
+          if (xai.recommendations && xai.recommendations.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #28a745;"><div class="issue-title">🎯 AI Recommendations</div>';
+            xai.recommendations.forEach(rec => {
+              const priorityColor = rec.priority === 'CRITICAL' ? '#dc3545' : rec.priority === 'HIGH' ? '#ffc107' : '#17a2b8';
+              html += `<div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-left: 3px solid ${priorityColor};">`;
+              html += `<div class="issue-detail"><strong>${escapeHtml(rec.recommendation)}</strong></div>`;
+              html += `<div style="font-size: 11px; color: #666; margin-top: 3px;">Category: ${escapeHtml(rec.category)} | Priority: <span style="color: ${priorityColor}; font-weight: bold;">${escapeHtml(rec.priority)}</span></div>`;
+              html += `</div>`;
+            });
+            html += '</div>';
+          }
+
+          // Best Practices
+          if (xai.best_practices && xai.best_practices.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #28a745;"><div class="issue-title">⭐ Best Practices</div>';
+            xai.best_practices.forEach(practice => {
+              if (typeof practice === 'object') {
+                html += `<div style="margin-top: 15px; padding: 10px; background: #d4edda; border-radius: 4px;">`;
+                html += `<div class="issue-title" style="color: #155724;">${escapeHtml(practice.title)}</div>`;
+                html += `<div class="issue-detail">${escapeHtml(practice.description)}</div>`;
+                if (practice.examples && practice.examples.length > 0) {
+                  html += `<div style="margin-top: 8px;"><strong style="font-size: 12px;">Examples:</strong></div>`;
+                  practice.examples.forEach(ex => {
+                    html += `<div style="margin-left: 20px; font-size: 12px;">• ${escapeHtml(ex)}</div>`;
+                  });
                 }
+                html += `</div>`;
               } else {
-                html += `<div class="issue-detail">• ${escapeHtml(rec)}</div>`;
+                html += `<div class="issue-detail">• ${escapeHtml(practice)}</div>`;
               }
             });
             html += '</div>';
           }
         }
-        
+
       } else {
         // AI/ML not available
         html += '<div class="issue ai-warning"><div class="issue-title" style="color: #856404;">⚠ AI/ML Not Available</div>';
