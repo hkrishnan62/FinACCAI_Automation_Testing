@@ -1,6 +1,7 @@
 // Popup script for FinACCAI extension
 let currentReport = null;
 let currentPageData = null;  // Store current page analysis data
+let currentScreenshot = null;  // Store current page screenshot
 
 // Test API availability with multiple URLs
 async function testAPIConnection() {
@@ -133,6 +134,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         try {
           const screenshotBase64 = await captureFullPageScreenshot(tab.id);
           if (screenshotBase64) {
+            // Store screenshot for later use
+            currentScreenshot = screenshotBase64;
             // Remove data:image/png;base64, prefix if present
             screenshotData = screenshotBase64.replace(/^data:image\/png;base64,/, '');
             displayScreenshot(screenshotBase64);
@@ -375,19 +378,34 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Capture full page screenshot
   async function captureFullPageScreenshot(tabId) {
     try {
-      // Get page dimensions
-      const dimensions = await chrome.tabs.sendMessage(tabId, {
-        action: 'getPageDimensions'
-      }).catch(() => ({ width: window.innerWidth, height: document.documentElement.scrollHeight }));
+      // First, scroll to top of page to ensure consistent capture
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'executeScript',
+        script: 'window.scrollTo(0, 0);'
+      }).catch(() => {});
       
-      // Capture visible area
-      return await chrome.tabs.captureVisibleTab(null, {
+      // Wait for scroll to complete and page to render
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Capture the visible viewport (which now shows the top of the page with highlights)
+      const screenshot = await chrome.tabs.captureVisibleTab(null, {
         format: 'png',
-        quality: 90
+        quality: 100
       });
+      
+      return screenshot;
     } catch (error) {
       console.error('Full page screenshot error:', error);
-      return null;
+      // Try a simple capture without scrolling
+      try {
+        return await chrome.tabs.captureVisibleTab(null, {
+          format: 'png',
+          quality: 90
+        });
+      } catch (fallbackError) {
+        console.error('Fallback screenshot also failed:', fallbackError);
+        return null;
+      }
     }
   }
   
@@ -483,12 +501,15 @@ document.addEventListener('DOMContentLoaded', async function() {
   async function downloadReport() {
     // Use stored page data for report generation
     if (currentPageData) {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      // Use already captured screenshot if available
+      let fullPageScreenshot = currentScreenshot;
       
-      // Capture full page screenshot
-      let fullPageScreenshot = null;
-      statusDiv.textContent = '📸 Capturing full page screenshot...';
-      fullPageScreenshot = await captureFullPageScreenshot(tab.id);
+      // If no screenshot stored, try to capture one now
+      if (!fullPageScreenshot) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        statusDiv.textContent = '📸 Capturing full page screenshot...';
+        fullPageScreenshot = await captureFullPageScreenshot(tab.id);
+      }
       
       const reportHtml = await generateClientReport(currentPageData.url, currentPageData.title, currentPageData.clientChecks, fullPageScreenshot);
       downloadHtmlFile(reportHtml, `accessibility_report_${Date.now()}.html`);

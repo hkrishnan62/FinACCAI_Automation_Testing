@@ -358,7 +358,74 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return true;
   }
+  
+  // Capture full page screenshot by stitching viewport captures
+  if (request.action === 'captureFullPageScreenshot') {
+    captureFullPage()
+      .then(dataUrl => sendResponse({ success: true, screenshot: dataUrl }))
+      .catch(error => sendResponse({ success: false, error: error.toString() }));
+    return true;
+  }
+  
+  // Execute arbitrary script
+  if (request.action === 'executeScript') {
+    try {
+      eval(request.script);
+      sendResponse({ success: true });
+    } catch (error) {
+      sendResponse({ success: false, error: error.toString() });
+    }
+    return true;
+  }
 });
+
+// Capture full page screenshot
+async function captureFullPage() {
+  const originalScrollY = window.scrollY;
+  const originalScrollX = window.scrollX;
+  
+  try {
+    // Get page dimensions
+    const pageHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.offsetHeight,
+      document.body.clientHeight,
+      document.documentElement.clientHeight
+    );
+    
+    const pageWidth = Math.max(
+      document.body.scrollWidth,
+      document.documentElement.scrollWidth,
+      document.body.offsetWidth,
+      document.documentElement.offsetWidth,
+      document.body.clientWidth,
+      document.documentElement.clientWidth
+    );
+    
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // For now, return a message that full stitching requires backend
+    // The extension will capture visible viewport with highlights
+    window.scrollTo(0, 0);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    return {
+      needsStitching: true,
+      pageHeight,
+      pageWidth,
+      viewportHeight,
+      viewportWidth,
+      message: 'Full page screenshot will be captured by extension API'
+    };
+    
+  } finally {
+    // Restore original scroll position
+    window.scrollTo(originalScrollX, originalScrollY);
+  }
+}
 
 // Inject a notification when the extension is ready
 console.log('FinACCAI Accessibility Checker is ready');

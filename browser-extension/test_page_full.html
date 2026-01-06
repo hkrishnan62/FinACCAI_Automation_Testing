@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinACCAI Test Page - Accessibility Issues</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        h1 { color: #2c3e50; }
+        h2 { color: #34495e; }
+        .button { 
+            padding: 10px 20px; 
+            background: #3498db; 
+            color: white; 
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-image {
+            max-width: 300px;
+            height: auto;
+            border: 1px solid #ccc;
+        }
+        input {
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Page for Accessibility Checker</h1>
+    
+    <div class="section">
+        <h2>Images without alt text</h2>
+        <p>These images should be flagged as accessibility issues:</p>
+        <img src="https://via.placeholder.com/300x200/3498db/ffffff?text=Image+1" class="test-image">
+        <img src="https://via.placeholder.com/300x200/e74c3c/ffffff?text=Image+2" class="test-image">
+    </div>
+    
+    <div class="section">
+        <h2>Form inputs without labels</h2>
+        <p>These form fields should be flagged:</p>
+        <input type="text" placeholder="Name (no label)">
+        <input type="email" placeholder="Email (no label)">
+        <input type="password" placeholder="Password (no label)">
+    </div>
+    
+    <div class="section">
+        <h3>Skipped heading level</h3>
+        <p>Notice we jumped from h2 to h4 (skipping h3)</p>
+        <h4>This is h4 - should be flagged</h4>
+        <p>Content here...</p>
+    </div>
+    
+    <div class="section">
+        <h2>Links with non-descriptive text</h2>
+        <p>These links should be flagged:</p>
+        <a href="#">Click here</a> for more information.<br>
+        <a href="#">Read more</a> about our services.<br>
+        <a href="#">Here</a> is the documentation.
+    </div>
+    
+    <div class="section">
+        <h2>Properly accessible elements (should pass)</h2>
+        <p>These should NOT be flagged:</p>
+        <img src="https://via.placeholder.com/300x200/2ecc71/ffffff?text=Good+Image" 
+             alt="A green placeholder image with white text" 
+             class="test-image">
+        <br>
+        <label for="goodInput">Name (with proper label):</label>
+        <input type="text" id="goodInput" placeholder="Enter your name">
+        <br>
+        <a href="#" aria-label="Download the 2024 accessibility report (PDF, 2MB)">Download report</a>
+    </div>
+    
+    <div class="section">
+        <h2>Summary</h2>
+        <p>This test page intentionally contains:</p>
+        <ul>
+            <li>2 images without alt text</li>
+            <li>3 form inputs without labels</li>
+            <li>1 heading hierarchy violation (h2 to h4)</li>
+            <li>3 links with non-descriptive text</li>
+        </ul>
+        <p><strong>Total expected issues: 9</strong></p>
+    </div>
+    
+    <footer style="margin-top: 50px; padding: 20px; background: #f5f5f5; text-align: center;">
+        <p>FinACCAI Browser Extension Test Page</p>
+        <p style="font-size: 0.9em; color: #666;">Use the extension to analyze this page and verify all issues are detected.</p>
+    </footer>
+</body>
+</html>
