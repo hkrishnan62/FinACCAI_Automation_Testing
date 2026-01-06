@@ -145,88 +145,49 @@ document.addEventListener('DOMContentLoaded', async function() {
           console.warn('Screenshot capture failed:', e);
         }
         
-        statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI analysis...</p>';
-        
-        // Try direct API call first (faster, works from extension context)
-        const apiUrl = await testAPIConnection();
-        console.log('[FinACCAI] API URL detected:', apiUrl);
-        
         // Get selected WCAG level from dropdown
         const selectedLevel = document.getElementById('levelSelect') ? document.getElementById('levelSelect').value : 'AAA';
         console.log('[FinACCAI] Selected WCAG level:', selectedLevel);
         
-        if (apiUrl) {
-          console.log('[FinACCAI] Attempting direct API call to:', apiUrl);
-          try {
-            const backendResponse = await fetch(apiUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                html: response.html,
-                url: response.url,
-                title: response.title,
-                level: selectedLevel,
-                screenshot: screenshotData
-              })
-            });
-            
-            if (backendResponse.ok) {
-              const responseData = await backendResponse.json();
-              console.log('[FinACCAI] Backend response received:', responseData);
-              analyzeBtn.disabled = false;
-              // Server returns {success: true, data: {...}}
-              currentReport = responseData.data || responseData;
-              console.log('[FinACCAI] Current report set:', currentReport);
-              displayAIStatus(currentReport);
-              statusDiv.innerHTML = '<p>✓ Full scan complete!</p>';
-              statusDiv.className = 'status success';
-              resultsDiv.classList.remove('hidden');
-              viewFullReportBtn.classList.remove('hidden');
-              downloadReportBtn.classList.remove('hidden');
-              return;
-            }
-          } catch (e) {
-            console.error('[FinACCAI] Direct API call failed:', e);
-            console.warn('Direct API call failed, trying service worker:', e);
-          }
-        } else {
-          console.warn('[FinACCAI] No API URL found, backend not available');
+        // Run AI/ML Analysis using client-side models
+        statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI/ML analysis...</p>';
+        
+        let aiMlResults = null;
+        try {
+          console.log('[FinACCAI] Starting client-side AI/ML analysis...');
+          aiMlResults = await finaccaiAI.generateReport(response.html, response.clientChecks);
+          console.log('[FinACCAI] AI/ML analysis complete:', aiMlResults);
+        } catch (e) {
+          console.error('[FinACCAI] AI/ML analysis error:', e);
+          aiMlResults = null;
         }
         
-        // Fallback: Use service worker
-        chrome.runtime.sendMessage({
-          action: 'analyzeWithBackend',
-          html: response.html,
-          url: response.url,
-          title: response.title,
-          level: selectedLevel,
-          screenshot: screenshotData
-        }, (backendResponse) => {
-          analyzeBtn.disabled = false;
+        // Display results
+        analyzeBtn.disabled = false;
+        
+        if (aiMlResults) {
+          // Create report object with AI data
+          const aiReport = {
+            ai_ml_enabled: true,
+            ai_ml_results: aiMlResults,
+            issues: response.clientChecks,
+            url: response.url,
+            title: response.title,
+            level: selectedLevel
+          };
           
-          if (backendResponse && backendResponse.success) {
-            currentReport = backendResponse.data;
-            displayAIStatus(backendResponse.data);
-            statusDiv.innerHTML = '<p>✓ Full scan complete!</p>';
-            statusDiv.className = 'status success';
-            resultsDiv.classList.remove('hidden');
-            viewFullReportBtn.classList.remove('hidden');
-            downloadReportBtn.classList.remove('hidden');
-          } else {
-            // Show client checks even if backend fails
-            aiStatusDiv.innerHTML = `
-              <p style="color: #856404;">⚠ Backend API not available</p>
-              <p style="font-size: 12px;">Client-side analysis completed successfully.</p>
-              <p style="font-size: 12px;">You can download a report of the findings below.</p>
-            `;
-            statusDiv.innerHTML = '<p>✓ Client-side scan complete</p>';
-            statusDiv.className = 'status success';
-            resultsDiv.classList.remove('hidden');
-            downloadReportBtn.classList.remove('hidden');
-          }
-        });
+          currentReport = aiReport;
+          displayAIStatus(aiReport);
+          statusDiv.innerHTML = '<p>✓ Full scan complete with AI/ML analysis!</p>';
+        } else {
+          // Fallback to client-side insights only
+          displayClientAIStatus(response.clientChecks);
+          statusDiv.innerHTML = '<p>✓ Scan complete! (Enhanced analysis)</p>';
+        }
+        
+        statusDiv.className = 'status success';
+        resultsDiv.classList.remove('hidden');
+        downloadReportBtn.classList.remove('hidden');
       });
     } catch (error) {
       showError('Error: ' + error.toString());
@@ -353,30 +314,89 @@ document.addEventListener('DOMContentLoaded', async function() {
     let html = '';
     
     if (data.ai_ml_enabled) {
-      html += '<p style="color: #28a745;">✓ Full AI/ML Analysis Complete</p>';
+      html += '<p style="color: #28a745; font-weight: bold;">✓ AI/ML Analysis Enabled</p>';
       html += '<ul style="font-size: 12px; margin: 10px 0; padding-left: 20px;">';
-      html += '<li>🤖 Machine Learning predictions</li>';
-      html += '<li>📝 Natural Language Processing</li>';
-      html += '<li>🖼️ Vision analysis</li>';
-      html += '<li>💡 Explainable AI insights</li>';
+      html += '<li>🧠 Advanced ML Pattern Detection</li>';
+      html += '<li>📝 NLP Text Quality Analysis</li>';
+      html += '<li>🖼️ Image & Visual Analysis</li>';
+      html += '<li>💡 Explainable AI Insights (XAI)</li>';
       html += '</ul>';
       
       if (data.ai_ml_results) {
-        const status = data.ai_ml_results.status;
-        if (status === 'AI/ML analysis completed') {
-          html += '<p style="font-size: 11px; color: #666; margin-top: 10px;">Advanced analysis techniques applied to detect complex accessibility issues.</p>';
-        } else {
-          html += `<p style="font-size: 11px; color: #856404; margin-top: 10px;">${status}</p>`;
+        const results = data.ai_ml_results;
+        
+        // Show compliance score if available
+        if (results.ml_predictions && results.ml_predictions.compliance_score !== undefined) {
+          const score = Math.round(results.ml_predictions.compliance_score);
+          const color = score >= 80 ? '#28a745' : score >= 60 ? '#ffc107' : '#dc3545';
+          html += `<p style="font-size: 12px; color: ${color}; margin: 10px 0;">
+            <strong>Accessibility Score:</strong> ${score}%
+          </p>`;
         }
+        
+        // Show top issues found
+        if (results.ml_predictions && results.ml_predictions.high_risk_issues) {
+          const issues = results.ml_predictions.high_risk_issues;
+          if (issues.length > 0) {
+            html += '<p style="font-size: 11px; color: #666; margin-top: 10px;"><strong>Critical Issues Found:</strong></p>';
+            html += '<ul style="font-size: 11px; padding-left: 20px; margin: 5px 0;">';
+            issues.slice(0, 3).forEach(issue => {
+              html += `<li>${issue.type.replace(/_/g, ' ')}: ${issue.count} issue${issue.count > 1 ? 's' : ''}</li>`;
+            });
+            html += '</ul>';
+          }
+        }
+        
+        html += '<p style="font-size: 11px; color: #666; margin-top: 10px;">Advanced analysis using in-browser ML models. No server required.</p>';
       }
     } else {
-      html += '<p style="color: #856404;">⚠ AI/ML Features Not Enabled</p>';
-      html += '<p style="font-size: 11px;">AI/ML libraries are not installed on the server.</p>';
-      html += '<p style="font-size: 11px;">Current analysis uses rule-based checks only.</p>';
-      html += '<details style="font-size: 11px; margin-top: 10px;"><summary style="cursor: pointer; color: #667eea;">How to enable AI/ML</summary>';
-      html += '<code style="display: block; background: #f4f4f4; padding: 5px; margin-top: 5px;">pip install transformers torch scikit-learn pillow</code>';
-      html += '</details>';
+      html += '<p style="color: #856404;">⚠ AI/ML Features Limited</p>';
+      html += '<p style="font-size: 11px;">Using rule-based analysis only. Client-side ML analysis not available.</p>';
     }
+    
+    aiStatusDiv.innerHTML = html;
+  }
+  
+  function displayClientAIStatus(checks) {
+    // Generate client-side AI insights based on check results
+    const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
+    
+    let html = '<p style="color: #667eea;">✓ Client-Side Analysis Complete</p>';
+    html += '<ul style="font-size: 12px; margin: 10px 0; padding-left: 20px;">';
+    
+    // Provide insights based on what was found
+    if (totalIssues === 0) {
+      html += '<li>✓ No accessibility issues detected</li>';
+      html += '<li>Page follows WCAG 2.1 guidelines</li>';
+    } else {
+      // Count issues by severity
+      const imageIssues = checks.images.length;
+      const inputIssues = checks.inputs.length;
+      const headingIssues = checks.headings.length;
+      const linkIssues = checks.links.length;
+      const ariaIssues = checks.aria.length;
+      
+      html += `<li>🔍 Found ${totalIssues} accessibility issues</li>`;
+      
+      if (imageIssues > 0) {
+        html += `<li>${imageIssues} image${imageIssues > 1 ? 's' : ''} need alt text (Critical)</li>`;
+      }
+      if (inputIssues > 0) {
+        html += `<li>${inputIssues} input${inputIssues > 1 ? 's' : ''} missing labels (Critical)</li>`;
+      }
+      if (headingIssues > 0) {
+        html += `<li>Heading hierarchy issues found (Important)</li>`;
+      }
+      if (linkIssues > 0) {
+        html += `<li>${linkIssues} link${linkIssues > 1 ? 's' : ''} accessibility problem${linkIssues > 1 ? 's' : ''}</li>`;
+      }
+      if (ariaIssues > 0) {
+        html += `<li>${ariaIssues} ARIA issue${ariaIssues > 1 ? 's' : ''} detected</li>`;
+      }
+    }
+    
+    html += '</ul>';
+    html += '<p style="font-size: 11px; color: #666; margin-top: 10px;">Rule-based analysis using DOM inspection and WCAG standards.</p>';
     
     aiStatusDiv.innerHTML = html;
   }

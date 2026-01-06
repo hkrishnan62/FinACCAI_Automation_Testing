@@ -12,7 +12,15 @@ async function testAPIHealth() {
   for (const url of API_URLS) {
     const baseUrl = url.replace('/api/analyze', '/api/health');
     try {
-      const response = await fetch(baseUrl, { method: 'GET', timeout: 2000 });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(baseUrl, { 
+        method: 'GET',
+        signal: controller.signal 
+      });
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         return url;
       }
@@ -34,6 +42,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       
       // Send HTML content to backend API for analysis
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      
       fetch(workingUrl, {
         method: 'POST',
         headers: {
@@ -46,7 +57,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           level: request.level || 'AAA',
           screenshot: request.screenshot || null
         }),
-        timeout: 30000
+        signal: controller.signal
       })
       .then(response => {
         if (!response.ok) {
@@ -55,10 +66,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return response.json();
       })
       .then(data => {
+        clearTimeout(timeoutId);
         console.log('✓ Backend analysis successful');
         sendResponse({ success: true, data: data });
       })
       .catch(error => {
+        clearTimeout(timeoutId);
         console.error('Backend analysis error:', error);
         sendResponse({ success: false, error: error.toString() });
       });
