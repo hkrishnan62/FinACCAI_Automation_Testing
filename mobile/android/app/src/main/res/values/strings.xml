@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">FinAccAI</string>
+    <string name="heading">FinAccAI Mobile Lab</string>
+    <string name="subheading">SeeTest-inspired dashboard for on-device accessibility audits.</string>
+    <string name="base_url_label">Analyzer endpoint</string>
+    <string name="base_url_hint">https://your-server.example.com</string>
+    <string name="analyze_sample">Run sample analysis</string>
+    <string name="analyze_live">Analyze current app</string>
+    <string name="open_accessibility">Enable Accessibility Service</string>
+    <string name="report_history">Recent reports</string>
+    <string name="open_report">Open selected report</string>
+    <string name="status_idle">Idle</string>
+    <string name="status_running">Analyzing…</string>
+    <string name="status_error">Error</string>
+    <string name="status_done">Completed</string>
+    <string name="toggle_ai">AI/ML insights</string>
+    <string name="toggle_screenshot">Include screenshot</string>
+    <string name="label_last_report">Last report</string>
+    <string name="empty_reports">No reports yet. Run an analysis to see history.</string>
+    <string name="service_state_on">Service active</string>
+    <string name="service_state_off">Service inactive</string>
+    <string name="cta_privacy">Privacy & policy</string>
+    <string name="accessibility_service_description">FinAccAI monitors app screens to analyze accessibility compliance. Tested apps' view hierarchies are analyzed locally and optionally sent to your configured analyzer endpoint for WCAG rule-based and AI-powered accessibility checks.</string>
+    <string name="privacy_policy_title">Privacy Policy</string>
+</resources>

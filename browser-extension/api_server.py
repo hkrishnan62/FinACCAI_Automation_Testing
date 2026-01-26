@@ -7,6 +7,7 @@ can call to analyze HTML content with the full FinACCAI pipeline.
 import os
 import sys
 from datetime import datetime
+from html import escape
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from bs4 import BeautifulSoup
@@ -33,6 +34,85 @@ CORS(app)  # Enable CORS for browser extension
 # Directory to store generated reports - use the root reports directory
 REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
 os.makedirs(REPORTS_DIR, exist_ok=True)
+
+
+def _json_node_to_html(node, depth=0, max_depth=25):
+    """Convert a mobile accessibility JSON node into a minimal HTML fragment."""
+    if not isinstance(node, dict) or depth > max_depth:
+        return ''
+
+    tag = (node.get('className') or node.get('class') or 'view').split('.')[-1].lower()
+    label = node.get('ariaLabel') or node.get('accessibilityLabel') or node.get('contentDescription') or node.get('content_desc') or node.get('text') or ''
+    resource_id = node.get('resourceId') or node.get('id') or ''
+    role = node.get('role') or tag
+
+    attrs = [f'data-role="{escape(str(role))}"']
+    if resource_id:
+        attrs.append(f'id="{escape(str(resource_id))}"')
+    if label:
+        attrs.append(f'aria-label="{escape(str(label))}"')
+    if node.get('clickable'):
+        attrs.append('data-clickable="true"')
+    if node.get('focusable'):
+        attrs.append('data-focusable="true"')
+    if node.get('enabled') is False:
+        attrs.append('data-disabled="true"')
+
+    children = node.get('children') or []
+    child_html = ''.join(_json_node_to_html(child, depth + 1, max_depth) for child in children)
+    text_content = escape(str(label)) if label else ''
+    attr_str = f" {' '.join(attrs)}" if attrs else ''
+    return f'<div class="{escape(tag)}"{attr_str}>{text_content}{child_html}</div>'
+
+
+def _xml_node_to_html(node, depth=0, max_depth=25):
+    """Convert a UIAutomator-style <node> element into HTML."""
+    if depth > max_depth:
+        return ''
+
+    cls = (node.get('class') or 'view').split('.')[-1].lower()
+    label = node.get('content-desc') or node.get('text') or ''
+    resource_id = node.get('resource-id') or ''
+    role = node.get('role') or cls
+
+    attrs = [f'data-role="{escape(str(role))}"']
+    if resource_id:
+        attrs.append(f'id="{escape(str(resource_id))}"')
+    if label:
+        attrs.append(f'aria-label="{escape(str(label))}"')
+    if node.get('clickable') == 'true':
+        attrs.append('data-clickable="true"')
+    if node.get('focusable') == 'true':
+        attrs.append('data-focusable="true"')
+    if node.get('enabled') == 'false':
+        attrs.append('data-disabled="true"')
+
+    children_html = ''.join(
+        _xml_node_to_html(child, depth + 1, max_depth)
+        for child in node.find_all('node', recursive=False)
+    )
+    text_content = escape(str(label)) if label else ''
+    attr_str = f" {' '.join(attrs)}" if attrs else ''
+    return f'<div class="{escape(cls)}"{attr_str}>{text_content}{children_html}</div>'
+
+
+def convert_view_hierarchy_to_html(view_hierarchy_json=None, view_hierarchy_xml=None):
+    """Convert a mobile view hierarchy payload to HTML understood by rule checks."""
+    if view_hierarchy_json:
+        try:
+            return f"<div class='mobile-root'>{_json_node_to_html(view_hierarchy_json)}</div>"
+        except Exception:
+            pass
+
+    if view_hierarchy_xml:
+        try:
+            xml_soup = BeautifulSoup(view_hierarchy_xml, 'xml')
+            root = xml_soup.find('node') or xml_soup
+            return f"<div class='mobile-root'>{_xml_node_to_html(root)}</div>"
+        except Exception:
+            pass
+
+    return None
 
 
 @app.route('/api/analyze', methods=['POST'])
@@ -125,6 +205,83 @@ def analyze_page():
             }
         })
         
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/mobile/analyze', methods=['POST'])
+def analyze_mobile_view():
+    """Analyze a mobile view hierarchy (Android) using the same rule/AI engines."""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'success': False, 'error': 'Missing request body'}), 400
+
+        level = data.get('level', 'AAA')
+        screenshot = data.get('screenshot')
+        app_name = data.get('app_name') or data.get('appName') or 'Mobile Screen'
+        package_name = data.get('package_name') or data.get('packageName') or 'mobile-app'
+
+        # Prefer raw HTML if caller provides it; otherwise build HTML from the view tree
+        html_content = data.get('html')
+        if not html_content:
+            html_content = convert_view_hierarchy_to_html(
+                view_hierarchy_json=data.get('view_hierarchy_json') or data.get('viewHierarchy'),
+                view_hierarchy_xml=data.get('view_hierarchy_xml') or data.get('viewHierarchyXml'),
+            )
+
+        if not html_content:
+            return jsonify({'success': False, 'error': 'No analyzable content provided (html or view hierarchy required)'}), 400
+
+        # Run rule-based checks
+        issues = script.run_checks(html_content, level=level)
+
+        # AI/ML Analysis (optional)
+        ai_ml_results = {}
+        soup = BeautifulSoup(html_content, 'html.parser')
+        if AI_ML_AVAILABLE:
+            try:
+                ai_ml_results['nlp_analysis'] = nlp_analysis.analyze_text(soup)
+                ai_ml_results['ml_predictions'] = ml_model.predict_issue_from_soup(soup)
+                ai_ml_results['vision_analysis'] = vision_analysis.analyze_images(soup, screenshot)
+                ai_ml_results['xai_explanations'] = xai_explanations.generate_explanations(issues, ai_ml_results)
+                ai_ml_results['status'] = 'AI/ML analysis completed'
+                ai_ml_results['level'] = level
+            except Exception as e:
+                ai_ml_results['status'] = f'AI/ML analysis failed: {str(e)}'
+                ai_ml_results['error'] = str(e)
+        else:
+            ai_ml_results['status'] = 'AI/ML modules not installed'
+            ai_ml_results['message'] = 'Install: pip install transformers torch scikit-learn'
+
+        # Generate report
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        report_filename = f'mobile_accessibility_report_{timestamp}.html'
+        report_path = os.path.join(REPORTS_DIR, report_filename)
+        app_url = f'app://{package_name}' if package_name else 'mobile-app'
+
+        report_html = generate_simple_report(app_url, app_name, issues, ai_ml_results, level=level, screenshot=screenshot)
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(report_html)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'issues': issues,
+                'ai_ml_results': ai_ml_results,
+                'ai_ml_enabled': AI_ML_AVAILABLE,
+                'totalIssues': sum(len(v) if isinstance(v, list) else 0 for v in issues.values()),
+                'reportPath': report_filename,
+                'reportUrl': f'/reports/{report_filename}',
+                'appName': app_name,
+                'packageName': package_name
+            }
+        })
+
     except Exception as e:
         return jsonify({
             'success': False,

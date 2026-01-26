@@ -110,6 +110,11 @@ python -m finaccai --csv websites.csv
 # 4. View report in log/ folder
 ```
 
+### Option 3: Mobile (Android beta)
+- Start the API server: `python browser-extension/api_server.py`
+- Enable the Android AccessibilityService skeleton in `mobile/android/FinAccAIAccessibilityService.kt` (update the backend URL).
+- Follow `mobile/README.md` to capture a view hierarchy + screenshot and POST to `/api/mobile/analyze`.
+
 ---
 
 ## 🎓 What It Checks (50+ Accessibility Rules)
