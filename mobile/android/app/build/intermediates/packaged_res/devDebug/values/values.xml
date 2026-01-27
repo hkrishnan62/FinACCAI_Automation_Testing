@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="md_theme_accent">#00D1A0</color>
+    <color name="md_theme_background">#0A1224</color>
+    <color name="md_theme_card">#111A2E</color>
+    <color name="md_theme_muted">#8BA1C1</color>
+    <color name="md_theme_on_background">#E8EDF7</color>
+    <color name="md_theme_on_primary">#FFFFFF</color>
+    <color name="md_theme_primary">#0C4B8F</color>
+    <color name="md_theme_primary_dark">#0A325E</color>
+    <color name="md_theme_surface">#0F172A</color>
+    <color name="md_theme_warning">#FFC93C</color>
+    <dimen name="card_corner_radius">12dp</dimen>
+    <dimen name="card_elevation">8dp</dimen>
+    <string name="accessibility_service_description">This service allows FinAcc AI to analyze the layout of other applications to identify accessibility issues.</string>
+    <string name="analyze_live">Analyze Live App</string>
+    <string name="analyze_sample">Run Sample Analysis</string>
+    <string name="app_name">FinAcc AI</string>
+    <string name="base_url_hint">https://reports.finacc.ai</string>
+    <string name="base_url_label">Analyzer Endpoint</string>
+    <string name="cta_privacy">Privacy &amp; Policy</string>
+    <string name="empty_reports">No reports yet. Run an analysis to see the history.</string>
+    <string name="heading">FinAcc AI</string>
+    <string name="label_last_report">Last Report</string>
+    <string name="open_accessibility">Enable Accessibility Service</string>
+    <string name="open_report">Open Report</string>
+    <string name="privacy_policy_title">Privacy Policy</string>
+    <string name="report_history">Recent Reports</string>
+    <string name="service_state_off">Service Inactive</string>
+    <string name="service_state_on">Service Active</string>
+    <string name="status_done">Analysis Complete</string>
+    <string name="status_error">Error</string>
+    <string name="status_idle">Ready</string>
+    <string name="status_running">Analyzing…</string>
+    <string name="toggle_ai">Enable AI/ML Insights</string>
+    <string name="toggle_ai_chip">AI/ML</string>
+    <string name="toggle_screenshot">Include Screenshot</string>
+    <style name="Theme.FinAccAI" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/md_theme_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_on_primary</item>
+        <item name="android:statusBarColor">@color/md_theme_surface</item>
+        <item name="android:navigationBarColor">@color/md_theme_surface</item>
+        <item name="android:windowBackground">@color/md_theme_background</item>
+        <item name="android:textColor">@color/md_theme_on_background</item>
+        <item name="buttonStyle">@style/Widget.FinAccAI.Button</item>
+    </style>
+    <style name="Widget.FinAccAI.Button" parent="Widget.Material3.Button">
+        <item name="android:textColor">@color/md_theme_on_primary</item>
+        <item name="backgroundTint">@color/md_theme_primary</item>
+    </style>
+    <style name="Widget.FinAccAI.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardElevation">@dimen/card_elevation</item>
+        <item name="cardCornerRadius">@dimen/card_corner_radius</item>
+    </style>
+</resources>

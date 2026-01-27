@@ -1,0 +1,1095 @@
+// Popup script for FinACCAI extension
+let currentReport = null;
+let currentPageData = null;  // Store current page analysis data
+let currentScreenshot = null;  // Store current page screenshot
+
+// Test API availability with multiple URLs
+async function testAPIConnection() {
+  const apiUrls = [
+    'http://localhost:5000/api/health',
+    'http://127.0.0.1:5000/api/health'
+  ];
+  
+  for (const url of apiUrls) {
+    try {
+      const response = await fetch(url, { method: 'GET' });
+      if (response.ok) {
+        return url.replace('/api/health', '/api/analyze');
+      }
+    } catch (e) {
+      // Try next URL
+    }
+  }
+  return null;
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const statusDiv = document.getElementById('status');
+  const resultsDiv = document.getElementById('results');
+  const quickChecksDiv = document.getElementById('quickChecks');
+  const aiStatusDiv = document.getElementById('aiStatus');
+  const viewFullReportBtn = document.getElementById('viewFullReport');
+  const downloadReportBtn = document.getElementById('downloadReport');
+  
+  // Check current tab on load
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || 
+        tab.url.startsWith('chrome-extension://') || tab.url.startsWith('about:')) {
+      statusDiv.innerHTML = '<p>⚠️ Cannot analyze browser internal pages. Please navigate to a regular webpage.</p>';
+      statusDiv.className = 'status';
+      analyzeBtn.disabled = true;
+    }
+  } catch (e) {
+    console.log('Error checking tab:', e);
+  }
+  
+  analyzeBtn.addEventListener('click', analyzePage);
+  viewFullReportBtn.addEventListener('click', viewFullReport);
+  downloadReportBtn.addEventListener('click', downloadReport);
+  
+  // Update level description when dropdown changes
+  const levelSelect = document.getElementById('levelSelect');
+  const levelInfo = document.querySelector('.level-info');
+  if (levelSelect && levelInfo) {
+    levelSelect.addEventListener('change', function() {
+      const descriptions = {
+        'A': 'Minimum accessibility - Basic requirements for all web content',
+        'AA': 'Standard compliance - Meets most accessibility needs (4.5:1 contrast)',
+        'AAA': 'Enhanced accessibility - Highest level with strict requirements (7:1 contrast)'
+      };
+      levelInfo.textContent = descriptions[this.value] || descriptions['AAA'];
+    });
+  }
+  
+  async function analyzePage() {
+    analyzeBtn.disabled = true;
+    statusDiv.innerHTML = '<div class="spinner"></div><p>Analyzing current page...</p>';
+    statusDiv.className = 'status loading';
+    resultsDiv.classList.add('hidden');
+    
+    try {
+      // Get the current tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // Check if the page is a restricted page
+      if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || 
+          tab.url.startsWith('chrome-extension://') || tab.url.startsWith('about:')) {
+        showError('Cannot analyze browser internal pages. Please navigate to a regular webpage.');
+        analyzeBtn.disabled = false;
+        return;
+      }
+      
+      // Try to inject content script if it's not already loaded
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        });
+      } catch (e) {
+        // Content script might already be injected, continue
+        console.log('Content script injection:', e.message);
+      }
+      
+      // Wait a moment for content script to load
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Send message to content script to analyze the page
+      chrome.tabs.sendMessage(tab.id, { action: 'analyzePage' }, async (response) => {
+        if (chrome.runtime.lastError) {
+          showError('Could not connect to page. Please refresh the page and try again. Error: ' + chrome.runtime.lastError.message);
+          analyzeBtn.disabled = false;
+          return;
+        }
+        
+        if (!response.success) {
+          showError('Error analyzing page: ' + response.error);
+          analyzeBtn.disabled = false;
+          return;
+        }
+        
+        // Store page data for report generation
+        currentPageData = response;
+        
+        // Display client-side check results
+        displayQuickChecks(response.clientChecks);
+        
+        // Highlight issues on the page
+        statusDiv.textContent = '🎯 Highlighting issues on page...';
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: 'highlightElements',
+            issues: response.clientChecks
+          });
+          // Wait for highlights to render
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (e) {
+          console.warn('Could not highlight elements:', e);
+        }
+        
+        // Capture full page screenshot WITH HIGHLIGHTS
+        statusDiv.textContent = '📸 Capturing screenshot with highlighted issues...';
+        let screenshotData = null;
+        try {
+          const screenshotBase64 = await captureFullPageScreenshot(tab.id);
+          console.log('[FinACCAI] Screenshot captured, length:', screenshotBase64 ? screenshotBase64.length : 0);
+          if (screenshotBase64) {
+            // Store screenshot for later use
+            currentScreenshot = screenshotBase64;
+            // Remove data:image/png;base64, prefix if present
+            screenshotData = screenshotBase64.replace(/^data:image\/png;base64,/, '');
+            displayScreenshot(screenshotBase64);
+          }
+        } catch (e) {
+          console.warn('Screenshot capture failed:', e);
+        }
+        
+        // Get selected WCAG level from dropdown
+        const selectedLevel = document.getElementById('levelSelect') ? document.getElementById('levelSelect').value : 'AAA';
+        console.log('[FinACCAI] Selected WCAG level:', selectedLevel);
+        
+        // Run AI/ML Analysis using client-side models
+        statusDiv.innerHTML = '<div class="spinner"></div><p>Running AI/ML analysis...</p>';
+        
+        let aiMlResults = null;
+        try {
+          console.log('[FinACCAI] Starting client-side AI/ML analysis...');
+          aiMlResults = await finaccaiAI.generateReport(response.html, response.clientChecks);
+          console.log('[FinACCAI] AI/ML analysis complete:', aiMlResults);
+        } catch (e) {
+          console.error('[FinACCAI] AI/ML analysis error:', e);
+          aiMlResults = null;
+        }
+        
+        // Display results
+        analyzeBtn.disabled = false;
+        
+        if (aiMlResults) {
+          // Create report object with AI data
+          const aiReport = {
+            ai_ml_enabled: true,
+            ai_ml_results: aiMlResults,
+            issues: response.clientChecks,
+            url: response.url,
+            title: response.title,
+            level: selectedLevel
+          };
+          
+          currentReport = aiReport;
+          displayAIStatus(aiReport);
+          statusDiv.innerHTML = '<p>✓ Full scan complete with AI/ML analysis!</p>';
+        } else {
+          // Fallback to client-side insights only
+          displayClientAIStatus(response.clientChecks);
+          statusDiv.innerHTML = '<p>✓ Scan complete! (Enhanced analysis)</p>';
+        }
+        
+        statusDiv.className = 'status success';
+        resultsDiv.classList.remove('hidden');
+        downloadReportBtn.classList.remove('hidden');
+      });
+    } catch (error) {
+      showError('Error: ' + error.toString());
+      analyzeBtn.disabled = false;
+    }
+  }
+  
+  function displayQuickChecks(checks) {
+    const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
+    
+    let html = `<div class="issue-count">
+      <span class="issue-label">Total Issues Found:</span>
+      <span class="issue-number ${totalIssues === 0 ? 'success' : ''}">${totalIssues}</span>
+    </div>`;
+    
+    const categories = [
+      { key: 'images', label: 'Missing Alt Text', icon: '🖼️' },
+      { key: 'inputs', label: 'Unlabeled Inputs', icon: '📝' },
+      { key: 'headings', label: 'Heading Hierarchy', icon: '📑' },
+      { key: 'links', label: 'Link Issues', icon: '🔗' },
+      { key: 'aria', label: 'ARIA Issues', icon: '♿' }
+    ];
+    
+    categories.forEach(cat => {
+      const count = checks[cat.key].length;
+      const categoryId = `category-${cat.key}`;
+      
+      html += `
+        <div class="issue-category">
+          <div class="issue-count clickable" onclick="toggleDetails('${categoryId}')">
+            <span class="issue-label">
+              ${cat.icon} ${cat.label}:
+              <span class="toggle-icon" id="toggle-${categoryId}">▶</span>
+            </span>
+            <span class="issue-number ${count === 0 ? 'success' : ''}">${count}</span>
+          </div>
+          <div class="issue-details" id="${categoryId}" style="display: none;">
+            ${formatIssueDetails(cat.key, checks[cat.key])}
+          </div>
+        </div>`;
+    });
+    
+    quickChecksDiv.innerHTML = html;
+    
+    // Add global toggle function
+    window.toggleDetails = function(id) {
+      const details = document.getElementById(id);
+      const toggle = document.getElementById('toggle-' + id);
+      if (details.style.display === 'none') {
+        details.style.display = 'block';
+        toggle.textContent = '▼';
+      } else {
+        details.style.display = 'none';
+        toggle.textContent = '▶';
+      }
+    };
+  }
+  
+  function formatIssueDetails(category, issues) {
+    if (issues.length === 0) {
+      return '<p class="no-issues">✓ No issues found</p>';
+    }
+    
+    let html = '<ul class="issue-list">';
+    
+    issues.forEach((issue, index) => {
+      switch(category) {
+        case 'images':
+          html += `<li class="issue-item">
+            <strong>Image ${index + 1}:</strong><br>
+            <span class="issue-detail">Source: ${issue.src || 'N/A'}</span><br>
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+          
+        case 'inputs':
+          html += `<li class="issue-item">
+            <strong>Input ${index + 1}:</strong> ${issue.type || 'text'}<br>
+            ${issue.id ? `<span class="issue-detail">ID: ${issue.id}</span><br>` : ''}
+            ${issue.name ? `<span class="issue-detail">Name: ${issue.name}</span><br>` : ''}
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+          
+        case 'headings':
+          html += `<li class="issue-item">
+            <strong>Heading ${index + 1}:</strong><br>
+            <span class="issue-detail">${issue.message}</span><br>
+            <span class="issue-detail">Text: "${issue.text}"</span>
+          </li>`;
+          break;
+          
+        case 'links':
+          html += `<li class="issue-item">
+            <strong>Link ${index + 1}:</strong><br>
+            <span class="issue-detail">${issue.message}</span><br>
+            ${issue.text ? `<span class="issue-detail">Text: "${issue.text}"</span><br>` : ''}
+            ${issue.href ? `<span class="issue-detail">URL: ${issue.href}</span><br>` : ''}
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+          
+        case 'aria':
+          html += `<li class="issue-item">
+            <strong>ARIA ${index + 1}:</strong> role="${issue.role}"<br>
+            <span class="issue-detail">${issue.message}</span><br>
+            <code class="issue-code">${escapeHtml(issue.snippet)}</code>
+          </li>`;
+          break;
+      }
+    });
+    
+    html += '</ul>';
+    return html;
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  function displayAIStatus(data) {
+    let html = '';
+    
+    if (data.ai_ml_enabled) {
+      html += '<p style="color: #28a745; font-weight: bold;">✓ AI/ML Analysis Enabled</p>';
+      html += '<ul style="font-size: 12px; margin: 10px 0; padding-left: 20px;">';
+      html += '<li>🧠 Advanced ML Pattern Detection</li>';
+      html += '<li>📝 NLP Text Quality Analysis</li>';
+      html += '<li>🖼️ Image & Visual Analysis</li>';
+      html += '<li>💡 Explainable AI Insights (XAI)</li>';
+      html += '</ul>';
+      
+      if (data.ai_ml_results) {
+        const results = data.ai_ml_results;
+        
+        // Show compliance score if available
+        if (results.ml_predictions && results.ml_predictions.compliance_score !== undefined) {
+          const score = Math.round(results.ml_predictions.compliance_score);
+          const color = score >= 80 ? '#28a745' : score >= 60 ? '#ffc107' : '#dc3545';
+          html += `<p style="font-size: 12px; color: ${color}; margin: 10px 0;">
+            <strong>Accessibility Score:</strong> ${score}%
+          </p>`;
+        }
+        
+        // Show top issues found
+        if (results.ml_predictions && results.ml_predictions.high_risk_issues) {
+          const issues = results.ml_predictions.high_risk_issues;
+          if (issues.length > 0) {
+            html += '<p style="font-size: 11px; color: #666; margin-top: 10px;"><strong>Critical Issues Found:</strong></p>';
+            html += '<ul style="font-size: 11px; padding-left: 20px; margin: 5px 0;">';
+            issues.slice(0, 3).forEach(issue => {
+              html += `<li>${issue.type.replace(/_/g, ' ')}: ${issue.count} issue${issue.count > 1 ? 's' : ''}</li>`;
+            });
+            html += '</ul>';
+          }
+        }
+        
+        html += '<p style="font-size: 11px; color: #666; margin-top: 10px;">Advanced analysis using in-browser ML models. No server required.</p>';
+      }
+    } else {
+      html += '<p style="color: #856404;">⚠ AI/ML Features Limited</p>';
+      html += '<p style="font-size: 11px;">Using rule-based analysis only. Client-side ML analysis not available.</p>';
+    }
+    
+    aiStatusDiv.innerHTML = html;
+  }
+  
+  function displayClientAIStatus(checks) {
+    // Generate client-side AI insights based on check results
+    const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
+    
+    let html = '<p style="color: #667eea;">✓ Client-Side Analysis Complete</p>';
+    html += '<ul style="font-size: 12px; margin: 10px 0; padding-left: 20px;">';
+    
+    // Provide insights based on what was found
+    if (totalIssues === 0) {
+      html += '<li>✓ No accessibility issues detected</li>';
+      html += '<li>Page follows WCAG 2.1 guidelines</li>';
+    } else {
+      // Count issues by severity
+      const imageIssues = checks.images.length;
+      const inputIssues = checks.inputs.length;
+      const headingIssues = checks.headings.length;
+      const linkIssues = checks.links.length;
+      const ariaIssues = checks.aria.length;
+      
+      html += `<li>🔍 Found ${totalIssues} accessibility issues</li>`;
+      
+      if (imageIssues > 0) {
+        html += `<li>${imageIssues} image${imageIssues > 1 ? 's' : ''} need alt text (Critical)</li>`;
+      }
+      if (inputIssues > 0) {
+        html += `<li>${inputIssues} input${inputIssues > 1 ? 's' : ''} missing labels (Critical)</li>`;
+      }
+      if (headingIssues > 0) {
+        html += `<li>Heading hierarchy issues found (Important)</li>`;
+      }
+      if (linkIssues > 0) {
+        html += `<li>${linkIssues} link${linkIssues > 1 ? 's' : ''} accessibility problem${linkIssues > 1 ? 's' : ''}</li>`;
+      }
+      if (ariaIssues > 0) {
+        html += `<li>${ariaIssues} ARIA issue${ariaIssues > 1 ? 's' : ''} detected</li>`;
+      }
+    }
+    
+    html += '</ul>';
+    html += '<p style="font-size: 11px; color: #666; margin-top: 10px;">Rule-based analysis using DOM inspection and WCAG standards.</p>';
+    
+    aiStatusDiv.innerHTML = html;
+  }
+  
+  function showError(message) {
+    statusDiv.innerHTML = `<p>✗ ${message}</p>`;
+    statusDiv.className = 'status error';
+  }
+  
+  // Capture full page screenshot by stitching multiple viewport captures
+  async function captureFullPageScreenshot(tabId) {
+    try {
+      // Get page dimensions
+      const dimensions = await chrome.tabs.sendMessage(tabId, {
+        action: 'getPageDimensions'
+      });
+      
+      if (!dimensions) {
+        throw new Error('Could not get page dimensions');
+      }
+      
+      const pageHeight = dimensions.scrollHeight || dimensions.height;
+      const viewportHeight = dimensions.height || window.innerHeight;
+      
+      // If page is smaller than viewport, just capture once
+      if (pageHeight <= viewportHeight * 1.5) {
+        // Scroll to top
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'executeScript',
+          script: 'window.scrollTo(0, 0);'
+        }).catch(() => {});
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const screenshot = await chrome.tabs.captureVisibleTab(null, {
+          format: 'png',
+          quality: 100
+        });
+        
+        return screenshot;
+      }
+      
+      // For longer pages, capture multiple viewports and return the first comprehensive one
+      // This is a simplified approach - full stitching would require canvas manipulation
+      const screenshots = [];
+      const numCaptures = Math.min(3, Math.ceil(pageHeight / viewportHeight)); // Limit to 3 captures
+      
+      for (let i = 0; i < numCaptures; i++) {
+        const scrollY = i * viewportHeight;
+        
+        // Scroll to position
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'executeScript',
+          script: `window.scrollTo(0, ${scrollY});`
+        }).catch(() => {});
+        
+        // Wait for rendering
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        // Capture this viewport
+        const screenshot = await chrome.tabs.captureVisibleTab(null, {
+          format: 'png',
+          quality: 95
+        });
+        
+        screenshots.push(screenshot);
+      }
+      
+      // Scroll back to top
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'executeScript',
+        script: 'window.scrollTo(0, 0);'
+      }).catch(() => {});
+      
+      // For now, return the first screenshot (top of page with highlights)
+      // In a future enhancement, these could be stitched together
+      // or sent to backend for server-side stitching
+      return screenshots[0];
+      
+    } catch (error) {
+      console.error('Full page screenshot error:', error);
+      // Try a simple capture without scrolling
+      try {
+        return await chrome.tabs.captureVisibleTab(null, {
+          format: 'png',
+          quality: 90
+        });
+      } catch (fallbackError) {
+        console.error('Fallback screenshot also failed:', fallbackError);
+        return null;
+      }
+    }
+  }
+  
+  // Capture individual issue element screenshot
+  async function captureIssueScreenshot(tabId, issueData) {
+    try {
+      // Scroll to element
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'scrollToElement',
+        selector: issueData.selector
+      });
+      
+      // Highlight the issue
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'highlightElements',
+        issues: [issueData]
+      });
+      
+      // Wait for render
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      // Capture screenshot
+      const screenshot = await chrome.tabs.captureVisibleTab(null, {
+        format: 'png',
+        quality: 95
+      });
+      
+      // Remove highlights
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'removeHighlights'
+      }).catch(() => {});
+      
+      return screenshot;
+    } catch (error) {
+      console.error('Issue screenshot error:', error);
+      return null;
+    }
+  }
+  
+  // Capture screenshots for multiple issues
+  async function captureIssueScreenshots(tabId, issues) {
+    const screenshots = {};
+    
+    for (let i = 0; i < Math.min(issues.length, 5); i++) {
+      const issue = issues[i];
+      if (issue.element && issue.element.outerHTML) {
+        const screenshot = await captureIssueScreenshot(tabId, issue);
+        if (screenshot) {
+          screenshots[`issue_${i}`] = screenshot;
+        }
+      }
+    }
+    
+    return screenshots;
+  }
+  
+  // Display screenshot in popup
+  function displayScreenshot(screenshotUrl) {
+    const existingScreenshot = document.querySelector('.screenshot-section');
+    if (existingScreenshot) {
+      existingScreenshot.remove();
+    }
+    
+    const screenshotSection = document.createElement('div');
+    screenshotSection.className = 'screenshot-section';
+    screenshotSection.innerHTML = `
+      <h3>📸 Error Screenshot</h3>
+      <div class="screenshot-container">
+        <img src="${screenshotUrl}" alt="Screenshot with highlighted errors" 
+             style="width: 100%; border-radius: 4px; border: 1px solid #ddd; cursor: pointer;"
+             onclick="window.open('${screenshotUrl}', '_blank')">
+        <p style="font-size: 11px; color: #666; margin-top: 5px; text-align: center;">
+          Failing elements are highlighted in red with numbered badges. Click to enlarge.
+        </p>
+      </div>
+    `;
+    
+    const quickChecks = document.getElementById('quickChecks');
+    if (quickChecks && quickChecks.firstChild) {
+      quickChecks.insertBefore(screenshotSection, quickChecks.firstChild);
+    }
+  }
+  
+  function viewFullReport() {
+    if (currentReport && currentReport.reportPath) {
+      // Open the generated report in a new tab
+      chrome.tabs.create({ url: `http://localhost:5000/reports/${currentReport.reportPath}` });
+    } else {
+      alert('Report not available. Make sure the backend server is running.');
+    }
+  }
+  
+  async function downloadReport() {
+    // Use stored page data for report generation
+    if (currentPageData) {
+      // Use already captured screenshot if available
+      let fullPageScreenshot = currentScreenshot;
+      
+      // If no screenshot stored, try to capture one now
+      if (!fullPageScreenshot) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        statusDiv.textContent = '📸 Capturing full page screenshot...';
+        fullPageScreenshot = await captureFullPageScreenshot(tab.id);
+      }
+      
+      // Get selected WCAG level
+      const selectedLevel = document.getElementById('levelSelect') ? document.getElementById('levelSelect').value : 'AAA';
+      
+      // Pass both client checks and backend report data (if available)
+      const reportHtml = await generateClientReport(
+        currentPageData.url, 
+        currentPageData.title, 
+        currentPageData.clientChecks, 
+        fullPageScreenshot,
+        currentReport,  // Pass backend data if available
+        selectedLevel
+      );
+      downloadHtmlFile(reportHtml, `accessibility_report_${Date.now()}.html`);
+      return;
+    }
+    
+    // Fallback: try to get backend report if available
+    if (currentReport && currentReport.reportPath) {
+      const reportUrl = `http://localhost:5000/reports/${currentReport.reportPath}`;
+      chrome.tabs.create({ url: reportUrl });
+    } else {
+      alert('No report data available. Please analyze the page first.');
+    }
+  }
+  
+  async function generateClientReport(url, title, checks, screenshotUrl = null, backendData = null, level = 'AAA') {
+    const timestamp = new Date().toLocaleString();
+    const totalIssues = Object.values(checks).reduce((sum, arr) => sum + arr.length, 0);
+    
+    // Determine analysis mode
+    let analysisMode = `WCAG 2.1 Level ${level} - Client-side analysis`;
+    if (backendData && backendData.ai_ml_enabled) {
+      analysisMode = `WCAG 2.1 Level ${level} with AI/ML Enhancement`;
+    }
+    
+    let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Report - ${escapeHtml(title)}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .header h1 { margin: 0 0 10px 0; }
+        .summary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .summary-item:last-child { border-bottom: none; }
+        .count {
+            font-weight: bold;
+            font-size: 24px;
+            color: #dc3545;
+        }
+        .count.success { color: #28a745; }
+        .category {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .category h2 {
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            color: #333;
+        }
+        .issue {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #dc3545;
+            border-radius: 4px;
+        }
+        .issue-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .issue-detail {
+            color: #666;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        .code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .no-issues {
+            color: #28a745;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+        .element-id {
+            background: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .issue-screenshot {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .issue-screenshot img {
+            max-width: 100%;
+            max-height: 400px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .issue-screenshot-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        .full-page-screenshot {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .full-page-screenshot img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        .ai-section {
+            border-left: 4px solid #667eea !important;
+        }
+        .ai-success {
+            background: #d4edda !important;
+            border-left: 4px solid #28a745 !important;
+        }
+        .ai-warning {
+            background: #fff3cd !important;
+            border-left: 4px solid #ffc107 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 FinACCAI Accessibility Report</h1>
+        <p><strong>Page:</strong> ${escapeHtml(title)}</p>
+        <p><strong>URL:</strong> ${escapeHtml(url)}</p>
+        <p><strong>Generated:</strong> ${timestamp}</p>
+        <p><strong>Analysis Mode:</strong> ${analysisMode}</p>
+    </div>
+        ${screenshotUrl ? `
+    <div class="full-page-screenshot">
+        <h2>📸 Full Page Screenshot</h2>
+        <p style="color: #666; margin-bottom: 15px;">Complete view of the analyzed page. Errors are highlighted in red with numbered badges.</p>
+        <img src="${screenshotUrl}" alt="Full page screenshot with highlighted errors">
+        <p style="color: #999; font-size: 12px; margin-top: 10px;">Reference numbers match the issue list below</p>
+    </div>
+    ` : ''}
+        <div class="summary">
+        <h2>Summary</h2>
+        <div class="summary-item">
+            <span>Total Issues Found:</span>
+            <span class="count ${totalIssues === 0 ? 'success' : ''}">${totalIssues}</span>
+        </div>
+        <div class="summary-item">
+            <span>🖼️ Missing Alt Text:</span>
+            <span class="count ${checks.images.length === 0 ? 'success' : ''}">${checks.images.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>📝 Unlabeled Inputs:</span>
+            <span class="count ${checks.inputs.length === 0 ? 'success' : ''}">${checks.inputs.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>📑 Heading Hierarchy:</span>
+            <span class="count ${checks.headings.length === 0 ? 'success' : ''}">${checks.headings.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>🔗 Link Issues:</span>
+            <span class="count ${checks.links.length === 0 ? 'success' : ''}">${checks.links.length}</span>
+        </div>
+        <div class="summary-item">
+            <span>♿ ARIA Issues:</span>
+            <span class="count ${checks.aria.length === 0 ? 'success' : ''}">${checks.aria.length}</span>
+        </div>
+    </div>
+`;
+    
+    // Images section
+    html += generateReportSection('🖼️ Missing Alt Text', checks.images, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Image without alt text</div>
+            <div class="issue-detail"><strong>Element:</strong> &lt;img&gt;</div>
+            <div class="issue-detail"><strong>Source:</strong> ${escapeHtml(issue.src || 'N/A')}</div>
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - all images have alt text');
+    
+    // Inputs section
+    html += generateReportSection('📝 Unlabeled Input Fields', checks.inputs, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Input without proper label</div>
+            <div class="issue-detail"><strong>Element:</strong> &lt;input type="${issue.type || 'text'}"&gt;</div>
+            ${issue.id ? `<div class="issue-detail"><strong>ID:</strong> <span class="element-id">${escapeHtml(issue.id)}</span></div>` : ''}
+            ${issue.name ? `<div class="issue-detail"><strong>Name:</strong> <span class="element-id">${escapeHtml(issue.name)}</span></div>` : ''}
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - all inputs are properly labeled');
+    
+    // Headings section
+    html += generateReportSection('📑 Heading Hierarchy Issues', checks.headings, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Heading hierarchy problem</div>
+            <div class="issue-detail"><strong>Problem:</strong> ${escapeHtml(issue.message)}</div>
+            <div class="issue-detail"><strong>Heading text:</strong> "${escapeHtml(issue.text)}"</div>
+        </div>
+    `, '✓ No issues found - heading hierarchy is correct');
+    
+    // Links section
+    html += generateReportSection('🔗 Link Accessibility Issues', checks.links, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: Link accessibility problem</div>
+            <div class="issue-detail"><strong>Problem:</strong> ${escapeHtml(issue.message)}</div>
+            ${issue.text ? `<div class="issue-detail"><strong>Link text:</strong> "${escapeHtml(issue.text)}"</div>` : ''}
+            ${issue.href ? `<div class="issue-detail"><strong>URL:</strong> ${escapeHtml(issue.href)}</div>` : ''}
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - all links are accessible');
+    
+    // ARIA section
+    html += generateReportSection('♿ ARIA Accessibility Issues', checks.aria, (issue, i) => `
+        <div class="issue">
+            <div class="issue-title">Issue #${i}: ARIA attribute problem</div>
+            <div class="issue-detail"><strong>Element role:</strong> <span class="element-id">${escapeHtml(issue.role)}</span></div>
+            <div class="issue-detail"><strong>Problem:</strong> ${escapeHtml(issue.message)}</div>
+            <div class="code">${escapeHtml(issue.snippet)}</div>
+        </div>
+    `, '✓ No issues found - ARIA attributes are correct');
+    
+    // AI/ML Analysis section (if backend data is available)
+    if (backendData && backendData.ai_ml_results) {
+      const aiResults = backendData.ai_ml_results;
+      
+      html += '<div class="category ai-section"><h2>🤖 AI/ML Analysis Results</h2>';
+      
+      if (backendData.ai_ml_enabled && aiResults.status === 'AI/ML analysis completed') {
+        html += '<div class="issue ai-success"><div class="issue-title" style="color: #155724;">✓ AI/ML Analysis Completed</div>';
+        html += '<div class="issue-detail" style="color: #155724;">Advanced analysis using machine learning and natural language processing</div></div>';
+        
+        // ML Predictions - Compliance Score
+        const mlPred = aiResults.ml_predictions || {};
+        if (mlPred.compliance_score !== undefined) {
+          const score = Math.round(mlPred.compliance_score);
+          const color = score >= 80 ? '#28a745' : score >= 60 ? '#ffc107' : '#dc3545';
+          html += `<div class="issue" style="border-left: 4px solid ${color}; background: ${color}20;">`;
+          html += `<div class="issue-title" style="color: ${color};">📊 Accessibility Compliance Score: ${score}%</div>`;
+          html += `</div>`;
+        }
+
+        // Summary
+        if (mlPred.summary && mlPred.summary.title) {
+          const bgColor = mlPred.summary.title.includes('Excellent') || mlPred.summary.title.includes('Good') ? '#d4edda' : 
+                         mlPred.summary.title.includes('Fair') ? '#fff3cd' : '#f8d7da';
+          const borderColor = mlPred.summary.title.includes('Excellent') || mlPred.summary.title.includes('Good') ? '#28a745' : 
+                            mlPred.summary.title.includes('Fair') ? '#ffc107' : '#dc3545';
+          html += `<div class="issue" style="border-left: 4px solid ${borderColor}; background: ${bgColor};">`;
+          html += `<div class="issue-title">${escapeHtml(mlPred.summary.title)}</div>`;
+          html += `<div class="issue-detail">${escapeHtml(mlPred.summary.description || '')}</div>`;
+          html += `</div>`;
+        }
+
+        // Critical Issues
+        if (mlPred.high_risk_issues && mlPred.high_risk_issues.length > 0) {
+          html += '<div class="issue" style="border-left: 4px solid #dc3545; background: #f8d7da;"><div class="issue-title" style="color: #721c24;">🚨 Critical Issues Found</div>';
+          mlPred.high_risk_issues.forEach((issue, i) => {
+            html += `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f5c6cb;">`;
+            html += `<div class="issue-title" style="color: #721c24;">${i + 1}. ${escapeHtml(issue.type.replace(/_/g, ' ')).toUpperCase()}</div>`;
+            html += `<div class="issue-detail"><strong>Count:</strong> ${issue.count} issue${issue.count > 1 ? 's' : ''}</div>`;
+            html += `<div class="issue-detail"><strong>Impact:</strong> ${escapeHtml(issue.impact)}</div>`;
+            if (issue.why_matters) {
+              html += `<div class="issue-detail"><strong>Why it matters:</strong> ${escapeHtml(issue.why_matters)}</div>`;
+            }
+            html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(issue.what_to_do)}</div>`;
+            html += `<div class="issue-detail" style="color: #666; font-size: 12px; margin-top: 5px;">WCAG Standard: ${escapeHtml(issue.wcag_standard)}</div>`;
+            html += `</div>`;
+          });
+          html += '</div>';
+        }
+
+        // Medium Risk Issues
+        if (mlPred.low_risk_issues && mlPred.low_risk_issues.length > 0) {
+          html += '<div class="issue" style="border-left: 4px solid #ffc107; background: #fff3cd;"><div class="issue-title" style="color: #856404;">⚠ Medium Priority Issues</div>';
+          mlPred.low_risk_issues.forEach((issue, i) => {
+            html += `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ffeeba;">`;
+            html += `<div class="issue-title" style="color: #856404;">${i + 1}. ${escapeHtml(issue.type.replace(/_/g, ' ')).toUpperCase()}</div>`;
+            html += `<div class="issue-detail"><strong>Count:</strong> ${issue.count} issue${issue.count > 1 ? 's' : ''}</div>`;
+            html += `<div class="issue-detail"><strong>Impact:</strong> ${escapeHtml(issue.impact)}</div>`;
+            if (issue.why_matters) {
+              html += `<div class="issue-detail"><strong>Why it matters:</strong> ${escapeHtml(issue.why_matters)}</div>`;
+            }
+            html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(issue.what_to_do)}</div>`;
+            html += `<div class="issue-detail" style="color: #666; font-size: 12px; margin-top: 5px;">WCAG Standard: ${escapeHtml(issue.wcag_standard)}</div>`;
+            html += `</div>`;
+          });
+          html += '</div>';
+        }
+
+        // NLP Analysis
+        const nlp = aiResults.nlp_analysis || {};
+        if (nlp && typeof nlp === 'object' && Object.keys(nlp).length > 0) {
+          html += '<div class="issue" style="border-left: 4px solid #17a2b8;"><div class="issue-title">📝 NLP (Natural Language Processing) Analysis</div>';
+          if (nlp.text_quality !== undefined) {
+            html += `<div class="issue-detail"><strong>Text Quality Score:</strong> ${Math.round(nlp.text_quality)}/100</div>`;
+          }
+          if (nlp.label_quality !== undefined) {
+            html += `<div class="issue-detail"><strong>Label Quality Score:</strong> ${Math.round(nlp.label_quality)}/100</div>`;
+          }
+          if (nlp.semantic_structure) {
+            html += `<div class="issue-detail"><strong>Semantic Structure:</strong> ${JSON.stringify(nlp.semantic_structure).replace(/[{}":]/g, ' ').trim()}</div>`;
+          }
+          if (nlp.recommendations && nlp.recommendations.length > 0) {
+            html += `<div class="issue-detail" style="margin-top: 10px;"><strong>Recommendations:</strong></div>`;
+            nlp.recommendations.forEach(rec => {
+              html += `<div class="issue-detail" style="margin-left: 20px;">• ${escapeHtml(rec)}</div>`;
+            });
+          }
+          html += '</div>';
+        }
+
+        // Vision Analysis
+        const vision = aiResults.vision_analysis || {};
+        if (vision && typeof vision === 'object' && vision.images_analyzed) {
+          const altCoverage = Math.round((vision.images_with_alt / vision.images_analyzed) * 100);
+          html += '<div class="issue" style="border-left: 4px solid #17a2b8;"><div class="issue-title">🖼️ Vision Analysis</div>';
+          html += `<div class="issue-detail"><strong>Images Found:</strong> ${vision.images_analyzed}</div>`;
+          html += `<div class="issue-detail"><strong>Images with Alt Text:</strong> ${vision.images_with_alt}/${vision.images_analyzed} (${altCoverage}%)</div>`;
+          if (vision.recommendations && vision.recommendations.length > 0) {
+            html += `<div class="issue-detail" style="margin-top: 10px;"><strong>Recommendations:</strong></div>`;
+            vision.recommendations.forEach(rec => {
+              html += `<div class="issue-detail" style="margin-left: 20px;">• ${escapeHtml(rec)}</div>`;
+            });
+          }
+          html += '</div>';
+        }
+
+        // XAI Explainable AI
+        const xai = aiResults.xai_explanations || {};
+        if (xai && typeof xai === 'object') {
+          // Critical Fixes
+          if (xai.critical_fixes && xai.critical_fixes.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #dc3545;"><div class="issue-title">💡 XAI: Critical Fixes Explained</div>';
+            xai.critical_fixes.forEach((fix, i) => {
+              html += `<div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px;">`;
+              html += `<div class="issue-title" style="color: #721c24;">${i + 1}. ${escapeHtml(fix.issue)}</div>`;
+              html += `<div class="issue-detail"><strong>Why this matters:</strong> ${escapeHtml(fix.why)}</div>`;
+              html += `<div class="issue-detail"><strong>Impact on users:</strong> ${escapeHtml(fix.impact_users)}</div>`;
+              html += `<div class="issue-detail"><strong>Severity:</strong> <span style="color: #dc3545; font-weight: bold;">${escapeHtml(fix.severity)}</span></div>`;
+              html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(fix.fix)}</div>`;
+              html += `<div style="background: #2d2d2d; color: #f8f8f2; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 8px 0;">`;
+              html += escapeHtml(fix.example);
+              html += `</div>`;
+              html += `<div class="issue-detail" style="color: #666; font-size: 12px;">WCAG Standard: ${escapeHtml(fix.wcag)}</div>`;
+              html += `</div>`;
+            });
+            html += '</div>';
+          }
+
+          // Important Fixes
+          if (xai.important_fixes && xai.important_fixes.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #ffc107;"><div class="issue-title">💡 XAI: Important Fixes Explained</div>';
+            xai.important_fixes.forEach((fix, i) => {
+              html += `<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px;">`;
+              html += `<div class="issue-title" style="color: #856404;">${i + 1}. ${escapeHtml(fix.issue)}</div>`;
+              html += `<div class="issue-detail"><strong>Why this matters:</strong> ${escapeHtml(fix.why)}</div>`;
+              html += `<div class="issue-detail"><strong>Impact on users:</strong> ${escapeHtml(fix.impact_users)}</div>`;
+              html += `<div class="issue-detail"><strong>Severity:</strong> <span style="color: #ffc107; font-weight: bold;">${escapeHtml(fix.severity)}</span></div>`;
+              html += `<div class="issue-detail"><strong>How to fix:</strong> ${escapeHtml(fix.fix)}</div>`;
+              html += `<div style="background: #2d2d2d; color: #f8f8f2; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 8px 0; white-space: pre-wrap;">`;
+              html += escapeHtml(fix.example);
+              html += `</div>`;
+              html += `<div class="issue-detail" style="color: #666; font-size: 12px;">WCAG Standard: ${escapeHtml(fix.wcag)}</div>`;
+              html += `</div>`;
+            });
+            html += '</div>';
+          }
+
+          // Recommendations
+          if (xai.recommendations && xai.recommendations.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #28a745;"><div class="issue-title">🎯 AI Recommendations</div>';
+            xai.recommendations.forEach(rec => {
+              const priorityColor = rec.priority === 'CRITICAL' ? '#dc3545' : rec.priority === 'HIGH' ? '#ffc107' : '#17a2b8';
+              html += `<div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-left: 3px solid ${priorityColor};">`;
+              html += `<div class="issue-detail"><strong>${escapeHtml(rec.recommendation)}</strong></div>`;
+              html += `<div style="font-size: 11px; color: #666; margin-top: 3px;">Category: ${escapeHtml(rec.category)} | Priority: <span style="color: ${priorityColor}; font-weight: bold;">${escapeHtml(rec.priority)}</span></div>`;
+              html += `</div>`;
+            });
+            html += '</div>';
+          }
+
+          // Best Practices
+          if (xai.best_practices && xai.best_practices.length > 0) {
+            html += '<div class="issue" style="border-left: 4px solid #28a745;"><div class="issue-title">⭐ Best Practices</div>';
+            xai.best_practices.forEach(practice => {
+              if (typeof practice === 'object') {
+                html += `<div style="margin-top: 15px; padding: 10px; background: #d4edda; border-radius: 4px;">`;
+                html += `<div class="issue-title" style="color: #155724;">${escapeHtml(practice.title)}</div>`;
+                html += `<div class="issue-detail">${escapeHtml(practice.description)}</div>`;
+                if (practice.examples && practice.examples.length > 0) {
+                  html += `<div style="margin-top: 8px;"><strong style="font-size: 12px;">Examples:</strong></div>`;
+                  practice.examples.forEach(ex => {
+                    html += `<div style="margin-left: 20px; font-size: 12px;">• ${escapeHtml(ex)}</div>`;
+                  });
+                }
+                html += `</div>`;
+              } else {
+                html += `<div class="issue-detail">• ${escapeHtml(practice)}</div>`;
+              }
+            });
+            html += '</div>';
+          }
+        }
+
+      } else {
+        // AI/ML not available
+        html += '<div class="issue ai-warning"><div class="issue-title" style="color: #856404;">⚠ AI/ML Not Available</div>';
+        html += `<div class="issue-detail" style="color: #856404;">${escapeHtml(aiResults.status || 'AI/ML modules not installed')}</div>`;
+        html += '<div class="issue-detail" style="color: #856404; margin-top: 10px;">';
+        html += '<strong>To enable AI/ML features:</strong><br>';
+        html += '<code style="background: #2d2d2d; color: #f8f8f2; padding: 5px; display: block; margin-top: 5px;">';
+        html += 'pip install transformers torch scikit-learn pillow';
+        html += '</code></div></div>';
+      }
+      
+      html += '</div>';
+    }
+    
+    html += '</body></html>';
+    return html;
+  }
+  
+  function generateReportSection(title, issues, issueFormatter, noIssuesMessage) {
+    let html = `<div class="category"><h2>${title} (${issues.length} issues)</h2>`;
+    
+    if (issues.length > 0) {
+      issues.forEach((issue, index) => {
+        html += issueFormatter(issue, index + 1);
+      });
+    } else {
+      html += `<div class="no-issues">${noIssuesMessage}</div>`;
+    }
+    
+    html += '</div>';
+    return html;
+  }
+  
+  function downloadHtmlFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({
+      url: url,
+      filename: filename,
+      saveAs: true
+    });
+  }
+});

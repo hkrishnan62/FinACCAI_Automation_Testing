@@ -1,0 +1,21 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.FinAccAI" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/md_theme_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_on_primary</item>
+        <item name="android:statusBarColor">@color/md_theme_surface</item>
+        <item name="android:navigationBarColor">@color/md_theme_surface</item>
+        <item name="android:windowBackground">@color/md_theme_background</item>
+        <item name="android:textColor">@color/md_theme_on_background</item>
+        <item name="buttonStyle">@style/Widget.FinAccAI.Button</item>
+    </style>
+
+    <style name="Widget.FinAccAI.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardElevation">@dimen/card_elevation</item>
+        <item name="cardCornerRadius">@dimen/card_corner_radius</item>
+    </style>
+
+    <style name="Widget.FinAccAI.Button" parent="Widget.Material3.Button">
+        <item name="android:textColor">@color/md_theme_on_primary</item>
+        <item name="backgroundTint">@color/md_theme_primary</item>
+    </style>
+</resources>

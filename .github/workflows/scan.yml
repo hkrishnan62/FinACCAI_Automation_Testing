@@ -1,0 +1,46 @@
+name: Accessibility scan
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions: read-all
+
+jobs:
+  scan:
+    name: Run accessibility scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install requests beautifulsoup4; fi
+
+      - name: Run scanner
+        run: |
+          python finaccai.py --csv websites.csv
+
+      - name: Show generated logs
+        run: |
+          echo "Contents of log/ (if any):"
+          ls -la log || true
+          echo "Contents of logs/ (if any):"
+          ls -la logs || true
+
+      - name: Upload HTML reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-reports
+          path: |
+            log/*.html
+            logs/*.html

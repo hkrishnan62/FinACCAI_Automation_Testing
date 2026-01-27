@@ -1,0 +1,90 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+}
+
+android {
+    namespace "com.finaccai.mobile"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.finaccai.mobile"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        vectorDrawables { useSupportLibrary = true }
+        
+        // BuildConfig constants for production
+        buildConfigField "boolean", "ENABLE_CRASH_REPORTING", "!BuildConfig.DEBUG"
+        buildConfigField "boolean", "ENABLE_ANALYTICS", "!BuildConfig.DEBUG"
+        buildConfigField "boolean", "ENFORCE_HTTPS_ONLY", "!BuildConfig.DEBUG"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("FINACCAI_KEYSTORE_PATH") ?: "keystore.jks")
+            storePassword System.getenv("FINACCAI_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("FINACCAI_KEY_ALIAS") ?: "finaccai"
+            keyPassword System.getenv("FINACCAI_KEY_PASSWORD")
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+            minifyEnabled false
+        }
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            signingConfig signingConfigs.release
+        }
+    }
+
+    flavorDimensions "environment"
+    productFlavors {
+        dev {
+            dimension "environment"
+            applicationId "com.finaccai.mobile.dev"
+        }
+        staging {
+            dimension "environment"
+            applicationId "com.finaccai.mobile.staging"
+        }
+        prod {
+            dimension "environment"
+            applicationId "com.finaccai.mobile"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+    implementation "androidx.core:core-ktx:1.12.0"
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.11.0"
+    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
+    implementation "androidx.browser:browser:1.7.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "androidx.recyclerview:recyclerview:1.3.2"
+}

@@ -1,0 +1,54 @@
+[
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\mipmap-anydpi-v33_ic_launcher.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\mipmap-anydpi-v33\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\xml_backup_rules.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\xml\\backup_rules.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\layout_item_report.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\layout\\item_report.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\drawable_hero_bg.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\drawable\\hero_bg.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\layout_activity_privacy_policy.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\layout\\activity_privacy_policy.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\xml_network_security_config.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\xml\\network_security_config.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\mipmap-anydpi-v26\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\xml_accessibility_service_config.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\xml\\accessibility_service_config.xml"
+    },
+    {
+        "merged": "com.finaccai.mobile.app-merged_res-33:/layout_activity_main.xml.flat",
+        "source": "com.finaccai.mobile.app-main-37:/layout/activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\mipmap-anydpi-v33_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\mipmap-anydpi-v33\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-merged_res-33:\\xml_data_extraction_rules.xml.flat",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\xml\\data_extraction_rules.xml"
+    }
+]

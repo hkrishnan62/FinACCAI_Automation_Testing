@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Accessibility Test</title>
+</head>
+<body>
+  <h1>Main Title</h1>
+  <h3>Skipped Heading</h3>  <!-- Skipped H2 level -->
+  <p style="color: #777; background-color: #eee;">
+    This gray text on light gray background has low contrast.
+  </p>
+  <img src="example.png">  <!-- Missing alt -->
+  <form>
+    <input type="text" id="name">
+    <!-- No label or aria-label for the input above -->
+  </form>
+</body>
+</html>

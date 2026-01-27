@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.finaccai.mobile.app-mergeDevDebugResources-32:/layout/activity_main.xml",
+        "source": "com.finaccai.mobile.app-main-37:/layout/activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-mergeDevDebugResources-32:\\layout\\activity_main.xml",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-mergeDevDebugResources-32:\\layout\\activity_privacy_policy.xml",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\layout\\activity_privacy_policy.xml"
+    },
+    {
+        "merged": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-mergeDevDebugResources-32:\\layout\\item_report.xml",
+        "source": "C:\\Users\\hkris\\.gradle\\daemon\\9.0-milestone-1\\com.finaccai.mobile.app-main-37:\\layout\\item_report.xml"
+    }
+]
